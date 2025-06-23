@@ -143,8 +143,7 @@ Extract news headlines from the above content (respond with numbered list or "No
                !lowercaseLine.includes('content') &&
                !lowercaseLine.includes('newsletter') &&
                !line.startsWith('---') &&
-               !line.startsWith('===') &&
-               line.length > 10; // Minimum headline length
+               !line.startsWith('===')
       });
 
     // Clean up bullet points, numbers, and formatting
@@ -158,7 +157,7 @@ Extract news headlines from the above content (respond with numbered list or "No
         .replace(/^["']/, '') // Remove leading quotes
         .replace(/["']$/, '') // Remove trailing quotes
         .trim();
-    }).filter(line => line.length > 5); // Filter very short lines
+    })
 
     return cleanedHeadlines;
   }

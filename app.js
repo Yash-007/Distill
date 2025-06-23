@@ -92,6 +92,23 @@ async function processEmails() {
           console.log(' -', link);
         });
       }
+
+            // Initialize processed email object early
+            const processedEmail = {
+              ...email,
+              newsHeadlines: [],
+              headlineExtractionError: null,
+              headlineCount: 0,
+              aiMetadata: null,
+              searchResults: [],
+              searchMetadata: {
+                totalSearches: 0,
+                successfulSearches: 0,
+                failedSearches: 0
+              },
+              processedAt: new Date().toISOString()
+            };
+            
       
       // Extract news headlines using AI
       console.log('\n🤖 Starting AI headline extraction...');
@@ -107,6 +124,12 @@ async function processEmails() {
           console.log(`  ${index + 1}. ${headline}`);
         });
         
+
+        // Update processed email with headline data
+        processedEmail.newsHeadlines = headlineResult.headlines;
+        processedEmail.headlineCount = headlineResult.headlines.length;
+        processedEmail.aiMetadata = headlineResult.metadata || null;
+
         // Add to overall collection
         allHeadlines.push(...headlineResult.headlines);
         emailSources.push(email.subject.replace('Fwd: ', ''));
@@ -157,16 +180,6 @@ async function processEmails() {
           failedSearches: 0
         };
       }
-      
-      // Store processed result with AI data
-      const processedEmail = {
-        ...email,
-        newsHeadlines: headlineResult.success ? headlineResult.headlines : [],
-        headlineExtractionError: headlineResult.success ? null : headlineResult.error,
-        headlineCount: headlineResult.success ? headlineResult.headlines.length : 0,
-        aiMetadata: headlineResult.metadata || null,
-        processedAt: new Date().toISOString()
-      };
       
       processedResults.push(processedEmail);
       
@@ -224,6 +237,9 @@ Thank you for using our service!
     } else {
       console.log('\n📭 No news headlines found across all emails');
     }
+  
+    
+    console.log(processedResults, 'processedResults');
     
     return {
       processed: emails.length,
@@ -359,9 +375,9 @@ console.log('🔄 Running initial email check...');
 processEmails();
 
 
-async function testSearXNG() {
-  const result = await searxng.searchHeadline("Microsoft to axe thousands of its sales staff", 4);
-  console.log(result);
-}
+// async function testSearXNG() {
+//   const result = await searxng.searchHeadline("Microsoft to axe thousands of its sales staff", 4);
+//   console.log(result);
+// }
 
-testSearXNG();
+// testSearXNG();

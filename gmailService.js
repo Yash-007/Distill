@@ -12,6 +12,7 @@ class GmailService {
     ];
     this.TOKEN_PATH = path.join(process.cwd(), 'token.json');
     this.CREDENTIALS_PATH = path.join(process.cwd(), 'credentials.json');
+    this.authClient = null;
   }
 
   // Load saved credentials if they exist
@@ -19,7 +20,17 @@ class GmailService {
     try {
       const content = await fs.readFile(this.TOKEN_PATH);
       const credentials = JSON.parse(content);
-      return google.auth.fromJSON(credentials);
+      const client = google.auth.fromJSON(credentials);
+      
+      // Set up automatic token refresh
+      client.on('tokens', (tokens) => {
+        if (tokens.refresh_token) {
+          // Store the new tokens
+          this.saveCredentials(client);
+        }
+      });
+      
+      return client;
     } catch (err) {
       return null;
     }
@@ -27,39 +38,118 @@ class GmailService {
 
   // Save credentials for future use
   async saveCredentials(client) {
-    const content = await fs.readFile(this.CREDENTIALS_PATH);
-    const keys = JSON.parse(content);
-    const key = keys.installed || keys.web;
-    const payload = JSON.stringify({
-      type: 'authorized_user',
-      client_id: key.client_id,
-      client_secret: key.client_secret,
-      refresh_token: client.credentials.refresh_token,
-    });
-    await fs.writeFile(this.TOKEN_PATH, payload);
+    try {
+      const content = await fs.readFile(this.CREDENTIALS_PATH);
+      const keys = JSON.parse(content);
+      const key = keys.installed || keys.web;
+      const payload = JSON.stringify({
+        type: 'authorized_user',
+        client_id: key.client_id,
+        client_secret: key.client_secret,
+        refresh_token: client.credentials.refresh_token,
+        access_token: client.credentials.access_token,
+      });
+      await fs.writeFile(this.TOKEN_PATH, payload);
+    } catch (error) {
+      console.error('Error saving credentials:', error);
+    }
+  }
+
+  // Check if token needs refresh
+  async isTokenValid(client) {
+    try {
+      const gmail = google.gmail({ version: 'v1', auth: client });
+      await gmail.users.getProfile({ userId: 'me' });
+      return true;
+    } catch (error) {
+      if (error.code === 401) {
+        return false; // Token expired
+      }
+      throw error; // Other error
+    }
   }
 
   // Authorize and get Gmail client
   async authorize() {
+    if (this.authClient) {
+      return this.authClient;
+    }
+
     let client = await this.loadSavedCredentialsIfExist();
+    
     if (client) {
-      return client;
+      // Check if token is valid
+      const isValid = await this.isTokenValid(client);
+      if (!isValid) {
+        try {
+          // Try to refresh the token
+          const { credentials } = await client.refreshAccessToken();
+          client.setCredentials(credentials);
+          await this.saveCredentials(client);
+          console.log('Token refreshed successfully');
+        } catch (refreshError) {
+          console.log('Failed to refresh token, re-authenticating...');
+          client = null;
+        }
+      }
     }
-    client = await authenticate({
-      scopes: this.SCOPES,
-      keyfilePath: this.CREDENTIALS_PATH,
-    });
-    if (client.credentials) {
-      await this.saveCredentials(client);
+
+    // If no client or refresh failed, authenticate again
+    if (!client) {
+      // Delete old token file
+      try {
+        await fs.unlink(this.TOKEN_PATH);
+      } catch (err) {
+        // File doesn't exist, that's fine
+      }
+
+      client = await authenticate({
+        scopes: this.SCOPES,
+        keyfilePath: this.CREDENTIALS_PATH,
+      });
+      
+      if (client.credentials) {
+        await this.saveCredentials(client);
+      }
     }
+
+    this.authClient = client;
     return client;
   }
 
-  // Get Gmail service instance
+  // Get Gmail service instance with error handling
   async getGmailService() {
-    const auth = await this.authorize();
-    return google.gmail({ version: 'v1', auth });
+    try {
+      const auth = await this.authorize();
+      return google.gmail({ version: 'v1', auth });
+    } catch (error) {
+      console.error('Error getting Gmail service:', error);
+      // Reset auth client to force re-authentication on next call
+      this.authClient = null;
+      throw error;
+    }
   }
+
+  // Wrapper method for Gmail API calls with automatic retry
+  async executeWithRetry(gmailApiCall, maxRetries = 1) {
+    let attempt = 0;
+    
+    while (attempt <= maxRetries) {
+      try {
+        const gmail = await this.getGmailService();
+        return await gmailApiCall(gmail);
+      } catch (error) {
+        if (error.code === 401 && attempt < maxRetries) {
+          console.log('Authentication error, retrying with fresh token...');
+          this.authClient = null; // Force re-authentication
+          attempt++;
+        } else {
+          throw error;
+        }
+      }
+    }
+  }
+
 
   // Read forwarded emails
   async getForwardedEmails() {
@@ -67,11 +157,16 @@ class GmailService {
     
     try {
       // Search for forwarded emails
-      const res = await gmail.users.messages.list({
+
+    // This will automatically handle token refresh if needed
+    const res = await this.executeWithRetry(async (gmail) => {
+      return await gmail.users.messages.list({
         userId: 'me',
         q: 'subject:Fwd: is:unread',
         maxResults: 2
-      });      
+      });
+    });
+    
 
       const messages = res.data.messages || [];
       console.log(`Found ${messages.length} forwarded emails`);
