@@ -3,22 +3,20 @@ const axios = require('axios');
 class SearXNGService {
   constructor(baseURL = 'http://localhost:8888') {
     this.baseURL = baseURL;
-    this.timeout = 10000; // 10 seconds timeout
+    this.timeout = 10000;
     this.maxRetries = 3;
-    this.retryDelay = 1000; // 1 second delay between retries
+    this.retryDelay = 1000;
   }
 
-  // Update SearXNG instance URL
   setBaseURL(url) {
     this.baseURL = url;
     console.log(`✅ SearXNG base URL updated to: ${url}`);
   }
 
-  // Search for a headline and return top results
+  // Original single headline search (unchanged)
   async searchHeadline(headline, resultsCount = 4, categories = 'general') {
     try {
-      console.log(`🔍 Searching SearXNG for: "${headline}"`);
-      console.log(`📊 Requesting ${resultsCount} results`);
+      console.log(`🔍 Searching: "${headline}"`);
 
       if (!headline || headline.trim().length === 0) {
         return {
@@ -29,25 +27,11 @@ class SearXNGService {
         };
       }
 
-      // Clean and prepare the search query
       const searchQuery = this.prepareSearchQuery(headline);
-      console.log(`🔧 Prepared query: "${searchQuery}"`);
-
-      // Make the search request with retry logic
       const searchResults = await this.makeSearchRequest(searchQuery, resultsCount, categories);
 
       if (searchResults.success) {
-        console.log(`✅ Found ${searchResults.results.length} results for: "${headline}"`);
-        
-        // Log sample results
-        if (searchResults.results.length > 0) {
-          console.log('📄 Sample results:');
-          searchResults.results.slice(0, 2).forEach((result, index) => {
-            console.log(`  ${index + 1}. ${result.title}`);
-            console.log(`     ${result.url}`);
-          });
-        }
-
+        console.log(`✅ Found ${searchResults.results.length} results`);
         return {
           success: true,
           headline: headline,
@@ -57,7 +41,7 @@ class SearXNGService {
           searchedAt: new Date().toISOString()
         };
       } else {
-        console.log(`❌ Search failed for: "${headline}" - ${searchResults.error}`);
+        console.log(`❌ Search failed: ${searchResults.error}`);
         return {
           success: false,
           error: searchResults.error,
@@ -68,7 +52,7 @@ class SearXNGService {
       }
 
     } catch (error) {
-      console.error(`❌ Error searching for headline "${headline}":`, error.message);
+      console.error(`❌ Error searching for headline:`, error.message);
       return {
         success: false,
         error: error.message || 'Failed to search headline',
@@ -78,16 +62,90 @@ class SearXNGService {
     }
   }
 
-  // Prepare search query from headline
-  prepareSearchQuery(headline) {
-    // Clean the headline for better search results
-    return headline
-      .replace(/[^\w\s-]/g, ' ') // Remove special characters except hyphens
-      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-      .trim()
+  // NEW: Parallel search with rate limiting
+  async searchMultipleHeadlinesParallel(headlines, resultsPerHeadline = 4, maxParallel = 5, staggerDelay = 200) {
+    try {
+      console.log(`🔍 Starting parallel search for ${headlines.length} headlines`);
+      console.log(`⚙️ Max parallel: ${maxParallel}, Stagger delay: ${staggerDelay}ms`);
+
+      const startTime = Date.now();
+      const allResults = [];
+      let successCount = 0;
+      let failureCount = 0;
+
+      // Process headlines in chunks to respect rate limits
+      for (let i = 0; i < headlines.length; i += maxParallel) {
+        const chunk = headlines.slice(i, i + maxParallel);
+        const chunkNumber = Math.floor(i / maxParallel) + 1;
+        const totalChunks = Math.ceil(headlines.length / maxParallel);
+        
+        console.log(`\n📦 Processing chunk ${chunkNumber}/${totalChunks} (${chunk.length} headlines)`);
+        
+        // Create staggered promises for this chunk
+        const chunkPromises = chunk.map((headline, index) => {
+          // Stagger the start of each request
+          const delay = index * staggerDelay;
+          return this.delay(delay).then(() => 
+            this.searchHeadline(headline, resultsPerHeadline)
+          );
+        });
+        
+        // Wait for all searches in this chunk to complete
+        const chunkResults = await Promise.all(chunkPromises);
+        
+        // Count successes and failures
+        chunkResults.forEach(result => {
+          if (result.success) {
+            successCount++;
+          } else {
+            failureCount++;
+          }
+          allResults.push(result);
+        });
+        
+        console.log(`✅ Chunk ${chunkNumber} completed: ${chunkResults.filter(r => r.success).length}/${chunk.length} successful`);
+      }
+
+      const totalTime = Date.now() - startTime;
+      console.log(`\n✅ All searches completed in ${totalTime}ms (${(totalTime/1000).toFixed(2)}s)`);
+      console.log(`   - Successful: ${successCount}/${headlines.length}`);
+      console.log(`   - Failed: ${failureCount}/${headlines.length}`);
+      console.log(`   - Average time per search: ${(totalTime/headlines.length).toFixed(0)}ms`);
+
+      return {
+        success: true,
+        totalHeadlines: headlines.length,
+        successfulSearches: successCount,
+        failedSearches: failureCount,
+        results: allResults,
+        totalTime: totalTime,
+        processedAt: new Date().toISOString()
+      };
+
+    } catch (error) {
+      console.error('❌ Error in parallel headline search:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to process headlines in parallel',
+        results: []
+      };
+    }
   }
 
-  // Make the actual search request with retry logic
+  // Keep the original sequential method for compatibility
+  async searchMultipleHeadlines(headlines, resultsPerHeadline = 4, delayBetweenSearches = 1000) {
+    // This method is kept for backward compatibility
+    // but now calls the parallel version with maxParallel = 1
+    return this.searchMultipleHeadlinesParallel(headlines, resultsPerHeadline, 1, delayBetweenSearches);
+  }
+
+  prepareSearchQuery(headline) {
+    return headline
+      .replace(/[^\w\s-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   async makeSearchRequest(query, resultsCount, categories, attempt = 1) {
     try {
       const searchParams = {
@@ -95,11 +153,11 @@ class SearXNGService {
         format: 'json',
         categories: categories,
         language: 'en',
-        time_range: 'week', // Search for recent articles
+        time_range: 'week',
         safesearch: '0'
       };
 
-      console.log(`📡 Making SearXNG request (attempt ${attempt}/${this.maxRetries})`);
+      console.log(`📡 Search request (attempt ${attempt}/${this.maxRetries})`);
 
       const response = await axios.get(`${this.baseURL}/search`, {
         params: searchParams,
@@ -123,7 +181,6 @@ class SearXNGService {
     } catch (error) {
       console.log(`❌ Search attempt ${attempt} failed: ${error.message}`);
       
-      // Retry logic
       if (attempt < this.maxRetries) {
         console.log(`🔄 Retrying in ${this.retryDelay}ms...`);
         await this.delay(this.retryDelay);
@@ -137,7 +194,6 @@ class SearXNGService {
     }
   }
 
-  // Parse and format search results
   parseSearchResults(data, maxResults) {
     if (!data.results || !Array.isArray(data.results)) {
       return [];
@@ -154,65 +210,9 @@ class SearXNGService {
         engine: result.engine || 'unknown',
         score: result.score || 0
       }))
-      .filter(result => result.url && result.title); // Filter out invalid results
+      .filter(result => result.url && result.title);
   }
 
-  // Search multiple headlines in batch
-  async searchMultipleHeadlines(headlines, resultsPerHeadline = 4, delayBetweenSearches = 1000) {
-    try {
-      console.log(`🔍 Starting batch search for ${headlines.length} headlines`);
-      console.log(`⏱️  Delay between searches: ${delayBetweenSearches}ms`);
-
-      const allResults = [];
-      let successCount = 0;
-      let failureCount = 0;
-
-      for (let i = 0; i < headlines.length; i++) {
-        const headline = headlines[i];
-        console.log(`\n📰 Processing headline ${i + 1}/${headlines.length}: "${headline}"`);
-
-        const searchResult = await this.searchHeadline(headline, resultsPerHeadline);
-        
-        if (searchResult.success) {
-          successCount++;
-        } else {
-          failureCount++;
-        }
-
-        allResults.push(searchResult);
-
-        // Add delay between searches to avoid overwhelming the server
-        if (i < headlines.length - 1) {
-          console.log(`⏳ Waiting ${delayBetweenSearches}ms before next search...`);
-          await this.delay(delayBetweenSearches);
-        }
-      }
-
-      console.log(`\n✅ Batch search completed:`);
-      console.log(`   - Successful searches: ${successCount}`);
-      console.log(`   - Failed searches: ${failureCount}`);
-      console.log(`   - Total headlines processed: ${headlines.length}`);
-
-      return {
-        success: true,
-        totalHeadlines: headlines.length,
-        successfulSearches: successCount,
-        failedSearches: failureCount,
-        results: allResults,
-        processedAt: new Date().toISOString()
-      };
-
-    } catch (error) {
-      console.error('❌ Error in batch headline search:', error);
-      return {
-        success: false,
-        error: error.message || 'Failed to process multiple headlines',
-        results: []
-      };
-    }
-  }
-
-  // Test SearXNG connection
   async testConnection() {
     try {
       console.log(`🧪 Testing SearXNG connection to: ${this.baseURL}`);
@@ -246,7 +246,6 @@ class SearXNGService {
     }
   }
 
-  // Get search statistics for a set of results
   getSearchStatistics(searchResults) {
     if (!searchResults || !Array.isArray(searchResults)) {
       return null;
@@ -262,7 +261,6 @@ class SearXNGService {
       topEngines: {}
     };
 
-    // Calculate detailed statistics
     searchResults.forEach(result => {
       if (result.success && result.results) {
         stats.totalArticles += result.results.length;
@@ -285,7 +283,6 @@ class SearXNGService {
     return stats;
   }
 
-  // Utility function for delays
   delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
