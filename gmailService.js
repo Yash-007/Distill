@@ -70,7 +70,7 @@ class GmailService {
       const res = await gmail.users.messages.list({
         userId: 'me',
         q: 'subject:Fwd: is:unread',
-        maxResults: 2
+        maxResults: 10
       });      
 
       const messages = res.data.messages || [];

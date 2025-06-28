@@ -142,19 +142,55 @@ async function processSingleEmail(email) {
   }
 }
 
-// Process emails in batches
-async function processEmailsBatch(emails, batchSize = CONFIG.BATCH_SIZE) {
-  const results = [];
-  const totalBatches = Math.ceil(emails.length / batchSize);
+// Test function for complete pipeline
+async function testCompletePipeline() {
+  console.log('🧪 Testing Complete Pipeline...\n');
   
-  console.log(`📦 Processing ${emails.length} emails in ${totalBatches} batches of ${batchSize}`);
+  // Test headlines
+  const testHeadlines = [
+    "Microsoft announces major layoffs in gaming division",
+    "Apple unveils new Vision Pro features at WWDC"
+  ];
   
-  for (let i = 0; i < emails.length; i += batchSize) {
-    const batchNumber = Math.floor(i / batchSize) + 1;
-    const batch = emails.slice(i, i + batchSize);
+  // 1. Search
+  console.log('1️⃣ Searching headlines...');
+  const searchResults = await searxng.searchMultipleHeadlinesParallel(
+    testHeadlines,
+    CONFIG.RESULTS_PER_HEADLINE,
+    CONFIG.MAX_PARALLEL_SEARCHES,
+    CONFIG.SEARCH_STAGGER_DELAY
+  );
+  
+  if (searchResults.success) {
+    // 2. Scrape
+    console.log('\n2️⃣ Scraping articles...');
+    const scrapedResults = await articleScraper.scrapeHeadlineResults(
+      searchResults.results,
+      CONFIG.SCRAPE_URLS_PER_HEADLINE,
+      CONFIG.MAX_PARALLEL_SCRAPES
+    );
     
-    console.log(`\n🔄 Processing batch ${batchNumber}/${totalBatches} (${batch.length} emails)`);
-    console.log(`   Reason: ${summary.reason}`);
+    // 3. Summarize
+    console.log('\n3️⃣ Generating summaries...');
+    const summaryResults = await contentSummarizer.summarizeHeadlines(scrapedResults);
+    fs.writeFileSync('test_summaries_result.json', JSON.stringify(summaryResults, null, 2), 'utf-8');
+
+    // 4. Display results
+    console.log('\n📊 Complete Pipeline Results:');
+    console.log('='.repeat(70));
+    
+    summaryResults.summaries.forEach((summary, index) => {
+      console.log(`\n📰 Headline: "${summary.headline}"`);
+      
+      if (summary.success) {
+        console.log(`✅ Summary (${summary.wordCount} words):`);
+        console.log(`   ${summary.summary}`);
+        console.log(`\n📌 Source: ${summary.sourceArticle.title || 'No title'}`);
+        console.log(`   URL: ${summary.sourceArticle.url}`);
+        console.log(`   (Article ${summary.sourceArticle.articleIndex} of ${summary.sourceArticle.totalArticlesChecked} checked)`);
+      } else {
+        console.log(`❌ No summary generated`);
+        console.log(`   Reason: ${summary.reason}`);
       }
       
       console.log('-'.repeat(70));
@@ -197,9 +233,7 @@ async function processEmails() {
   
   try {
     console.log('📧 Checking for new forwarded emails...');
-    console.log(`⚙️ Configuration: Batch size=${CONFIG.BATCH_SIZE}, Max parallel searches=${CONFIG.MAX_PARALLEL_SEARCHES}`);
     
-    // Get forwarded emails
     const emails = await gmailService.getForwardedEmails();
     
     if (emails.length === 0) {
@@ -215,7 +249,6 @@ async function processEmails() {
     
     console.log(`📬 Found ${emails.length} emails to process`);
     
-    // Process emails in batches
     const processedResults = await processEmailsBatch(emails, CONFIG.BATCH_SIZE);
     
     // Log complete results for each email
@@ -289,33 +322,10 @@ async function processEmails() {
   }
 }
 
-// API Endpoints (same as before)
-app.get('/process', async (req, res) => {
-  const result = await processEmails();
-  res.json(result);
-});
-
-app.post('/update-headline-prompt', async (req, res) => {
-  const { prompt } = req.body;
-  
-  if (!prompt) {
-    return res.status(400).json({ error: 'Prompt is required' });
-  }
-  
-  const result = newsAI.updatePrompt(prompt);
-  res.json({ 
-    success: true, 
-    message: 'News headline extraction prompt updated successfully',
-    prompt: prompt
-  });
-});
-
-app.get('/headline-prompt', (req, res) => {
-  res.json({ 
-    prompt: newsAI.getCurrentPrompt(),
-    model: 'gemini-1.5-flash',
-    purpose: 'Extract news headlines from newsletter content'
-  });
+// Test endpoint
+app.get('/test-complete-pipeline', async (req, res) => {
+  await testCompletePipeline();
+  res.json({ message: 'Pipeline test completed. Check console for results.' });
 });
 
 // Other endpoints remain the same...
@@ -356,14 +366,6 @@ main();
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📰 News Headlines Extractor Ready (Parallel Processing Mode)`);
-  console.log(`⚙️ Configuration:`, CONFIG);
-  console.log(`🔗 Visit http://localhost:${PORT}/process to check emails`);
+  console.log(`📰 Newsletter Processor with AI Summarization Ready`);
+  console.log(`🔗 Test complete pipeline: http://localhost:${PORT}/test-complete-pipeline`);
 });
-
-// Optional: Run every 5 minutes
-// setInterval(processEmails, 5 * 60 * 1000);
-
-// Run once on startup
-console.log('🔄 Running initial email check...');
-processEmails();
