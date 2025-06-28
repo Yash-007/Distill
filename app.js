@@ -4,6 +4,7 @@ const SearXNGService = require('./searxngService');
 const ArticleScraper = require('./articleScraper');
 const ContentSummarizer = require('./contentSummarizer'); // NEW
 const express = require('express');
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
@@ -23,7 +24,7 @@ const CONFIG = {
   MAX_PARALLEL_SCRAPES: 5
 };
 
-// Process a single email (extracted for parallel processing)
+// Process a single email (updated with summarization)
 async function processSingleEmail(email) {
   const startTime = Date.now();
   
@@ -66,9 +67,10 @@ async function processSingleEmail(email) {
       processingTime: 0
     };
     
-    // If headlines found, search them in parallel
+    // If headlines found, search, scrape, and summarize
     if (headlineResult.success && headlineResult.headlines.length > 0) {
-      console.log(`🔍 Searching ${headlineResult.headlines.length} headlines in parallel...`);
+      // 1. Search headlines
+      console.log(`🔍 Searching ${headlineResult.headlines.length} headlines...`);
       
       const searchResults = await searxng.searchMultipleHeadlinesParallel(
         headlineResult.headlines,
@@ -167,7 +169,7 @@ async function processEmailsBatch(emails, batchSize = CONFIG.BATCH_SIZE) {
   return results;
 }
 
-// Main email processing function
+// Update process emails to include summary stats
 async function processEmails() {
   const overallStartTime = Date.now();
   
@@ -196,6 +198,7 @@ async function processEmails() {
     
     // Aggregate results
     const allHeadlines = [];
+    const allSummaries = [];
     let totalSearches = 0;
     let successfulSearches = 0;
     let totalScrapedArticles = 0;
@@ -207,8 +210,17 @@ async function processEmails() {
       if (result.newsHeadlines && result.newsHeadlines.length > 0) {
         allHeadlines.push(...result.newsHeadlines);
       }
+      
+      if (result.headlineSummaries && result.headlineSummaries.length > 0) {
+        allSummaries.push(...result.headlineSummaries.filter(s => s.success));
+      }
+      
       totalSearches += result.searchMetadata?.totalSearches || 0;
       successfulSearches += result.searchMetadata?.successfulSearches || 0;
+      totalScrapedArticles += result.scrapeMetadata?.totalAttempted || 0;
+      successfulScrapes += result.scrapeMetadata?.successfulScrapes || 0;
+      totalSummaries += result.summaryMetadata?.totalSummaries || 0;
+      successfulSummaries += result.summaryMetadata?.successfulSummaries || 0;
     });
     
     const totalTime = Date.now() - overallStartTime;
@@ -228,11 +240,15 @@ async function processEmails() {
       results: processedResults,
       totalHeadlines: allHeadlines.length,
       headlines: allHeadlines,
+      summaries: allSummaries,
       totalSearches: totalSearches,
       successfulSearches: successfulSearches,
+      totalScrapedArticles: totalScrapedArticles,
+      successfulScrapes: successfulScrapes,
+      totalSummaries: totalSummaries,
+      successfulSummaries: successfulSummaries,
       totalProcessingTime: totalTime,
-      averageTimePerEmail: totalTime / emails.length,
-      summary: `Processed ${emails.length} emails with ${allHeadlines.length} headlines in ${(totalTime/1000).toFixed(2)}s`
+      averageTimePerEmail: totalTime / emails.length
     };
     
   } catch (error) {
@@ -276,93 +292,41 @@ app.get('/headline-prompt', (req, res) => {
   });
 });
 
-app.post('/test-headline-extraction', async (req, res) => {
-  const { content, subject = 'Test Email', from = 'test@example.com' } = req.body;
+// Other endpoints remain the same...
+
+// Process emails in batches remains the same...
+async function processEmailsBatch(emails, batchSize = CONFIG.BATCH_SIZE) {
+  const results = [];
+  const totalBatches = Math.ceil(emails.length / batchSize);
   
-  if (!content) {
-    return res.status(400).json({ error: 'Content is required' });
+  for (let i = 0; i < emails.length; i += batchSize) {
+    const batchNumber = Math.floor(i / batchSize) + 1;
+    const batch = emails.slice(i, i + batchSize);
+    
+    console.log(`\n🔄 Processing batch ${batchNumber}/${totalBatches} (${batch.length} emails)`);
+    const batchStartTime = Date.now();
+    
+    const batchPromises = batch.map(email => processSingleEmail(email));
+    const batchResults = await Promise.all(batchPromises);
+    
+    results.push(...batchResults);
+    
+    const batchTime = Date.now() - batchStartTime;
+    console.log(`✅ Batch ${batchNumber} completed in ${batchTime}ms`);
   }
   
-  const result = await newsAI.extractNewsHeadlines(content, subject, from);
-  res.json(result);
-});
+  return results;
+}
 
-app.get('/test-searxng', async (req, res) => {
-  const result = await searxng.testConnection();
-  res.json(result);
-});
+async function main() {
+  // await testCompletePipeline();
+  const results = await processEmails();
+  fs.writeFileSync('final_result.json', JSON.stringify(results, null, 2), 'utf-8');
+  // console.log(results);
+}
 
-app.post('/search-headline', async (req, res) => {
-  const { headline, resultsCount = 4 } = req.body;
-  
-  if (!headline) {
-    return res.status(400).json({ error: 'Headline is required' });
-  }
-  
-  const result = await searxng.searchHeadline(headline, resultsCount);
-  res.json(result);
-});
+main();
 
-app.post('/update-searxng-url', async (req, res) => {
-  const { url } = req.body;
-  
-  if (!url) {
-    return res.status(400).json({ error: 'SearXNG URL is required' });
-  }
-  
-  searxng.setBaseURL(url);
-  const testResult = await searxng.testConnection();
-  
-  res.json({
-    success: testResult.success,
-    message: testResult.success ? 'SearXNG URL updated and tested successfully' : 'SearXNG URL updated but connection test failed',
-    url: url,
-    connectionTest: testResult
-  });
-});
-
-app.get('/stats', (req, res) => {
-  res.json({
-    service: 'Newsletter News Headlines Extractor',
-    model: 'gemini-1.5-flash',
-    configuration: CONFIG,
-    features: [
-      'Parallel email processing',
-      'Batch processing support',
-      'Parallel headline searching',
-      'Configurable rate limiting',
-      'Automatic news headline extraction',
-      'Filters out advertising and promotional content'
-    ],
-    lastStartup: new Date().toISOString()
-  });
-});
-
-app.get('/', (req, res) => {
-  res.json({ 
-    status: '🚀 Newsletter News Headlines Extractor Running (Parallel Mode)',
-    model: 'gemini-1.5-flash',
-    configuration: CONFIG,
-    endpoints: {
-      'GET /process': 'Process forwarded emails in parallel batches',
-      'POST /update-headline-prompt': 'Update news headline extraction prompt',
-      'GET /headline-prompt': 'Get current headline extraction prompt',
-      'POST /test-headline-extraction': 'Test headline extraction',
-      'GET /test-searxng': 'Test SearXNG connection',
-      'POST /search-headline': 'Search a single headline',
-      'POST /update-searxng-url': 'Update SearXNG instance URL',
-      'GET /stats': 'Get service statistics and configuration'
-    }
-  });
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Server error:', err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
-});
-
-// Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
