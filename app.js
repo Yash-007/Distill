@@ -1,6 +1,8 @@
 const GmailService = require('./gmailService');
 const NewsHeadlineExtractor = require('./newsHeadlineExtractor');
 const SearXNGService = require('./searxngService');
+const ArticleScraper = require('./articleScraper');
+const ContentSummarizer = require('./contentSummarizer'); // NEW
 const express = require('express');
 require('dotenv').config();
 
@@ -8,17 +10,18 @@ const app = express();
 const gmailService = new GmailService();
 const newsAI = new NewsHeadlineExtractor();
 const searxng = new SearXNGService(process.env.SEARXNG_URL || 'http://localhost:8080');
+const articleScraper = new ArticleScraper();
+const contentSummarizer = new ContentSummarizer(); // NEW
 
 // Configuration
 const CONFIG = {
   BATCH_SIZE: parseInt(process.env.BATCH_SIZE) || 3,
   MAX_PARALLEL_SEARCHES: parseInt(process.env.MAX_PARALLEL_SEARCHES) || 5,
-  SEARCH_STAGGER_DELAY: parseInt(process.env.SEARCH_STAGGER_DELAY) || 200, // ms between search starts
-  RESULTS_PER_HEADLINE: 4
+  SEARCH_STAGGER_DELAY: parseInt(process.env.SEARCH_STAGGER_DELAY) || 200,
+  RESULTS_PER_HEADLINE: 4,
+  SCRAPE_URLS_PER_HEADLINE: 2,
+  MAX_PARALLEL_SCRAPES: 5
 };
-
-// Middleware
-app.use(express.json());
 
 // Process a single email (extracted for parallel processing)
 async function processSingleEmail(email) {
@@ -42,10 +45,22 @@ async function processSingleEmail(email) {
       headlineCount: headlineResult.success ? headlineResult.headlines.length : 0,
       aiMetadata: headlineResult.metadata || null,
       searchResults: [],
+      scrapedArticles: [],
+      headlineSummaries: [], // NEW
       searchMetadata: {
         totalSearches: 0,
         successfulSearches: 0,
         failedSearches: 0
+      },
+      scrapeMetadata: {
+        totalScraped: 0,
+        successfulScrapes: 0,
+        failedScrapes: 0
+      },
+      summaryMetadata: { // NEW
+        totalSummaries: 0,
+        successfulSummaries: 0,
+        failedSummaries: 0
       },
       processedAt: new Date().toISOString(),
       processingTime: 0
@@ -70,7 +85,41 @@ async function processSingleEmail(email) {
           failedSearches: searchResults.failedSearches
         };
         
-        console.log(`✅ Searches complete: ${searchResults.successfulSearches}/${searchResults.totalHeadlines} successful`);
+        // 2. Scrape articles
+        console.log(`\n🌐 Scraping articles...`);
+        
+        const scrapedResults = await articleScraper.scrapeHeadlineResults(
+          searchResults.results,
+          CONFIG.SCRAPE_URLS_PER_HEADLINE,
+          CONFIG.MAX_PARALLEL_SCRAPES
+        );
+        
+        processedEmail.scrapedArticles = scrapedResults;
+        
+        // Calculate scraping statistics
+        const totalScraped = scrapedResults.reduce((sum, r) => sum + (r.scrapedCount || 0), 0);
+        const totalAttempted = scrapedResults.reduce((sum, r) => sum + r.scrapedArticles.length, 0);
+        
+        processedEmail.scrapeMetadata = {
+          totalScraped: totalScraped,
+          successfulScrapes: totalScraped,
+          failedScrapes: totalAttempted - totalScraped,
+          totalAttempted: totalAttempted
+        };
+        
+        // 3. Generate AI summaries
+        console.log(`\n📝 Generating AI summaries...`);
+        
+        const summaryResults = await contentSummarizer.summarizeHeadlines(scrapedResults);
+        
+        processedEmail.headlineSummaries = summaryResults.summaries;
+        processedEmail.summaryMetadata = {
+          totalSummaries: summaryResults.totalHeadlines,
+          successfulSummaries: summaryResults.successfulSummaries,
+          failedSummaries: summaryResults.failedSummaries
+        };
+        
+        console.log(`✅ Summaries generated: ${summaryResults.successfulSummaries}/${summaryResults.totalHeadlines}`);
       }
     }
     
@@ -149,6 +198,10 @@ async function processEmails() {
     const allHeadlines = [];
     let totalSearches = 0;
     let successfulSearches = 0;
+    let totalScrapedArticles = 0;
+    let successfulScrapes = 0;
+    let totalSummaries = 0;
+    let successfulSummaries = 0;
     
     processedResults.forEach(result => {
       if (result.newsHeadlines && result.newsHeadlines.length > 0) {
