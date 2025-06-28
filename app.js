@@ -154,19 +154,41 @@ async function processEmailsBatch(emails, batchSize = CONFIG.BATCH_SIZE) {
     const batch = emails.slice(i, i + batchSize);
     
     console.log(`\n🔄 Processing batch ${batchNumber}/${totalBatches} (${batch.length} emails)`);
-    const batchStartTime = Date.now();
+    console.log(`   Reason: ${summary.reason}`);
+      }
+      
+      console.log('-'.repeat(70));
+    });
+  }
+}
+
+// Helper function to display complete results
+function logCompleteResults(email) {
+  console.log('\n' + '='.repeat(80));
+  console.log('📊 COMPLETE PROCESSING RESULTS');
+  console.log('='.repeat(80));
+  
+  console.log(`\n📧 Email: ${email.subject}`);
+  console.log(`   Headlines found: ${email.headlineCount}`);
+  console.log(`   Articles scraped: ${email.scrapeMetadata.successfulScrapes}`);
+  console.log(`   Summaries generated: ${email.summaryMetadata.successfulSummaries}`);
+  
+  if (email.headlineSummaries && email.headlineSummaries.length > 0) {
+    console.log('\n📝 Generated Summaries:');
     
-    // Process all emails in this batch in parallel
-    const batchPromises = batch.map(email => processSingleEmail(email));
-    const batchResults = await Promise.all(batchPromises);
-    
-    results.push(...batchResults);
-    
-    const batchTime = Date.now() - batchStartTime;
-    console.log(`✅ Batch ${batchNumber} completed in ${batchTime}ms`);
+    email.headlineSummaries.forEach((summary, idx) => {
+      console.log(`\n${idx + 1}. "${summary.headline}"`);
+      
+      if (summary.success) {
+        console.log(`   ✅ Summary: ${summary.summary}`);
+        console.log(`   📌 Source: ${summary.sourceArticle.title || 'Article'} (checked ${summary.sourceArticle.totalArticlesChecked} articles)`);
+      } else {
+        console.log(`   ❌ No relevant content found`);
+      }
+    });
   }
   
-  return results;
+  console.log('\n' + '='.repeat(80) + '\n');
 }
 
 // Update process emails to include summary stats
@@ -195,6 +217,9 @@ async function processEmails() {
     
     // Process emails in batches
     const processedResults = await processEmailsBatch(emails, CONFIG.BATCH_SIZE);
+    
+    // Log complete results for each email
+    processedResults.forEach(email => logCompleteResults(email));
     
     // Aggregate results
     const allHeadlines = [];
@@ -225,15 +250,16 @@ async function processEmails() {
     
     const totalTime = Date.now() - overallStartTime;
     
-    // Summary
+    // Final summary
     console.log('\n' + '='.repeat(60));
-    console.log('📊 PROCESSING SUMMARY:');
+    console.log('📊 FINAL PROCESSING SUMMARY:');
     console.log(`✅ Emails processed: ${emails.length}`);
-    console.log(`📰 Total headlines extracted: ${allHeadlines.length}`);
-    console.log(`🔍 Total searches performed: ${totalSearches}`);
-    console.log(`✅ Successful searches: ${successfulSearches}`);
-    console.log(`⏱️ Total processing time: ${totalTime}ms (${(totalTime/1000).toFixed(2)}s)`);
-    console.log(`📈 Average time per email: ${(totalTime/emails.length).toFixed(0)}ms`);
+    console.log(`📰 Headlines extracted: ${allHeadlines.length}`);
+    console.log(`🔍 Searches performed: ${successfulSearches}/${totalSearches}`);
+    console.log(`🌐 Articles scraped: ${successfulScrapes}/${totalScrapedArticles}`);
+    console.log(`📝 Summaries generated: ${successfulSummaries}/${totalSummaries}`);
+    console.log(`⏱️ Total time: ${(totalTime/1000).toFixed(2)}s`);
+    console.log('='.repeat(60));
     
     return {
       processed: emails.length,
