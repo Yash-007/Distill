@@ -364,24 +364,24 @@ async function main() {
 main();
 
 
-// async function testVertexAI() {
-//   const summarizer = new ContentSummarizer();
+async function testVertexAI() {
+  const summarizer = new ContentSummarizer();
   
-//   const testHeadline = "Microsoft plans further layoffs in its Xbox division";
-//   const testContent = "Microsoft plans further layoffs in its Xbox division in early July 2025, adding to previous rounds in 2024.  This follows pressure to increase profit margins after the Activision Blizzard acquisition. While specifics are unconfirmed, the cuts are anticipated to be substantial and part of a broader company restructuring impacting various departments.  Previous layoffs included 650 employees in September 2024, primarily in corporate and support roles, and over 6,000 in May 2024, mainly in product and engineering.  The tech industry is experiencing widespread layoffs, with Microsoft's actions reflecting this trend.  The upcoming cuts are expected to affect more than just sales teams, though the final scope and schedule remain uncertain.";
+  const testHeadline = "Microsoft plans further layoffs in its Xbox division";
+  const testContent = "Microsoft plans further layoffs in its Xbox division in early July 2025, adding to previous rounds in 2024.  This follows pressure to increase profit margins after the Activision Blizzard acquisition. While specifics are unconfirmed, the cuts are anticipated to be substantial and part of a broader company restructuring impacting various departments.  Previous layoffs included 650 employees in September 2024, primarily in corporate and support roles, and over 6,000 in May 2024, mainly in product and engineering.  The tech industry is experiencing widespread layoffs, with Microsoft's actions reflecting this trend.  The upcoming cuts are expected to affect more than just sales teams, though the final scope and schedule remain uncertain.";
   
-//   setTimeout(async() => {
-//     const result = await summarizer.analyzeAndSummarize(
-//       testHeadline,
-//       testContent,
-//       "Test Article"
-//     );
+  setTimeout(async() => {
+    const result = await summarizer.analyzeAndSummarize(
+      testHeadline,
+      testContent,
+      "Test Article"
+    );
     
-//     console.log('Test result:', result);
-//   }, 3000);
-// }
+    console.log('Test result:', result);
+  }, 3000);
+}
 
-// testVertexAI();
+testVertexAI();
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
