@@ -381,7 +381,7 @@ async function testVertexAI() {
   }, 3000);
 }
 
-testVertexAI();
+// testVertexAI();
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
