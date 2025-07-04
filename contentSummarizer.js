@@ -1,22 +1,53 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { VertexAI } = require('@google-cloud/vertexai');
+const path = require('path');
+const { GoogleAuth } = require('google-auth-library');
 require('dotenv').config();
 
 class ContentSummarizer {
   constructor() {
-    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    this.model = this.genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
-      generationConfig: {
-        temperature: 0.3,
-        topP: 0.8,
-        topK: 40,
-        maxOutputTokens: 256,
-      }
-    });
+    this.initializeVertexAI();
     
     // Configuration for delays
-    this.API_CALL_DELAY = 15000; // 15 seconds between API calls
+    this.API_CALL_DELAY = 10000; // 15 seconds between API calls
     this.lastApiCallTime = 0;
+  }
+
+  async initializeVertexAI() {
+    try {
+      // Get project ID and location
+      const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT_ID;
+      const location = process.env.VERTEX_AI_LOCATION || 'us-central1';
+      
+      if (!projectId) {
+        throw new Error('GOOGLE_CLOUD_PROJECT or GCP_PROJECT_ID environment variable is required');
+      }
+      
+      console.log(`🔧 Initializing Vertex AI...`);
+      console.log(`📁 Project: ${projectId}`);
+      console.log(`📍 Location: ${location}`);
+    
+      
+      // Initialize Vertex AI 
+      this.vertexAI = new VertexAI({
+        project: projectId,
+        location: location,
+      });
+      
+      // Initialize the model
+      this.model = this.vertexAI.preview.getGenerativeModel({
+        model: 'gemini-2.0-flash-lite-001',
+        generationConfig: {
+          temperature: 0.3,
+          topP: 0.8,
+          topK: 40,
+        },
+      });
+
+      console.log(`✅ Vertex AI initialized successfully`);      
+    } catch (error) {
+      console.error('❌ Failed to initialize Vertex AI:', error.message);
+      throw error;
+    }
   }
 
   // Ensure minimum delay between API calls
@@ -37,7 +68,7 @@ class ContentSummarizer {
   async analyzeAndSummarize(headline, articleContent, articleTitle = '') {
     try {
       // Enforce delay before API call
-      // await this.enforceApiDelay();
+      await this.enforceApiDelay();
       
       const prompt = `
 You are a news content analyzer. Your task is to:
@@ -65,12 +96,28 @@ If not relevant: NOT_RELEVANT
 `;
 
       console.log(`🤖 Checking relevance for headline: "${headline}"`);
-      console.log(`📡 Making Gemini API call...`);
+      console.log(`📡 Making Vertex AI call (gemini-2.0-flash-lite-001)...`);
       
-      const result = await this.model.generateContent(prompt);
-      const response = result.response.text().trim();
+      // Generate content using Vertex AI
+      const request = {
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: prompt }],
+          },
+        ],
+      };
       
-      if (response === 'NOT_RELEVANT' || response.includes('NOT_RELEVANT')) {
+      const result = await this.model.generateContent(request);
+      const response = result.response;
+      
+      // Extract text from response
+      let responseText = '';
+      if (response.candidates && response.candidates[0]) {
+        responseText = response.candidates[0].content.parts[0].text.trim();
+      }
+      
+      if (!responseText || responseText === 'NOT_RELEVANT' || responseText.includes('NOT_RELEVANT')) {
         return {
           relevant: false,
           summary: null
@@ -78,17 +125,23 @@ If not relevant: NOT_RELEVANT
       }
       
       // Count words in summary
-      const wordCount = response.split(/\s+/).filter(word => word.length > 0).length;
+      const wordCount = responseText.split(/\s+/).filter(word => word.length > 0).length;
       console.log(`✅ Content relevant, summary generated (${wordCount} words)`);
       
       return {
         relevant: true,
-        summary: response,
+        summary: responseText,
         wordCount: wordCount
       };
       
     } catch (error) {
       console.error('Error in content analysis:', error.message);
+      
+      // Log more details for Vertex AI errors
+      if (error.details) {
+        console.error('Error details:', error.details);
+      }
+      
       return {
         relevant: false,
         summary: null,
@@ -149,6 +202,7 @@ If not relevant: NOT_RELEVANT
   // Process multiple headlines with their scraped articles
   async summarizeHeadlines(scrapedResults) {
     console.log(`\n🤖 Starting AI summarization for ${scrapedResults.length} headlines...`);
+    console.log(`🚀 Using Vertex AI with model: gemini-2.0-flash-lite-001`);
     console.log(`⏱️ Note: Using ${this.API_CALL_DELAY/1000}s delay between API calls`);
     
     // Estimate total time
