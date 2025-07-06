@@ -6,167 +6,129 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url = env("DATABASE_URL")
 }
 
-
-
-// User table
 model User {
-  id            String          @id // Gmail address as ID
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  
+  id        String @id // gmail address
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
-  emails        Email[]
-  headlines     Headline[]
-  searchResults SearchResult[]
-  scrapedArticles ScrapedArticle[]
-  summaries     Summary[]
+  emails Email[]
   
   @@map("users")
 }
 
-// Email content table
 model Email {
-  id            String          @id @default(uuid())
-  userId        String
-  gmailId       String          @unique // Gmail message ID
-  subject       String
-  fromEmail     String
-  fromName      String?
-  content       String          @db.Text
-  cleanedBody   String          @db.Text
-  rawBody       String?         @db.Text
-  receivedAt    DateTime
-  processedAt   DateTime        @default(now())
-  
-  // Metadata
-  linkCount     Int             @default(0)
-  wordCount     Int             @default(0)
-  
-  // Relations
-  user          User            @relation(fields: [userId], references: [id])
-  headlines     Headline[]
-  searchResults SearchResult[]
-  scrapedArticles ScrapedArticle[]
-  summaries     Summary[]
-  
+  id String @id @default(uuid())
+  userId String 
+  gmailId String @unique // gmail id
+  subject String
+  fromEmail String
+  fromName String?
+  content String   @db.Text
+  cleanedBody String @db.Text
+  rawBody String? @db.Text
+  receivedAt DateTime
+  processedAt DateTime @default(now())
+
+
+  // metadata
+  linkCount Int @default(0)
+  wordCount Int @default(0)
+
+  // Relations 
+
+  user User @relation(fields: [userId], references: [id])
+  headlines Headlines?
+  searchResults SearchResults?
+  scrapedResults ScrapedResults?
+  summaries  Summaries?
+
   @@index([userId])
   @@map("emails")
 }
 
-// Headlines table
-model Headline {
-  id            String          @id @default(uuid())
-  emailId       String
-  userId        String
-  headline      String
-  position      Int             // Order in email
-  createdAt     DateTime        @default(now())
-  
-  // Relations
-  email         Email           @relation(fields: [emailId], references: [id])
-  user          User            @relation(fields: [userId], references: [id])
-  searchResults SearchResult[]
-  summaries     Summary[]
-  
-  @@index([emailId])
-  @@index([userId])
-  @@map("headlines")
+model Headlines {
+  id String @id @default(uuid())
+  msgId String  @unique
+  userId String
+
+  // headlines as json array
+  data Json 
+  total Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  // relations
+  email Email @relation(fields: [msgId], references: [id])
+
+@@index([msgId])
+@@map("headlines")
 }
 
-// Search results table
-model SearchResult {
-  id                String          @id @default(uuid())
-  headlineId        String
-  emailId           String
-  userId            String
-  
-  // Search metadata
-  found             Boolean         @default(false)
-  totalResults      Int             @default(0)
-  query             String
-  searchedAt        DateTime        @default(now())
-  
-  // Results data
-  results           Json?           // Store search results as JSON
-  
-  // Relations
-  headline          Headline        @relation(fields: [headlineId], references: [id])
-  email             Email           @relation(fields: [emailId], references: [id])
-  user              User            @relation(fields: [userId], references: [id])
-  scrapedArticles   ScrapedArticle[]
-  
-  @@index([headlineId])
-  @@index([emailId])
-  @@index([userId])
-  @@map("search_results")
+
+model SearchResults {
+  id String @id @default(uuid())
+  msgId String @unique
+  userId String
+
+  // search results
+ data Json   // map: headline -> search results
+ total Int @default(0)
+ successful Int @default(0)
+
+ searchedAt DateTime @default(now())
+
+ // relations
+ email Email @relation(fields: [msgId], references: [id])
+
+ @@index([msgId])
+ @@map("search_results")
 }
 
-// Scraped articles table
-model ScrapedArticle {
-  id                String          @id @default(uuid())
-  searchResultId    String
-  emailId           String
-  userId            String
-  
-  // Article data
-  url               String
-  title             String?
-  content           String?         @db.Text
-  contentPreview    String?
-  wordCount         Int             @default(0)
-  
-  // Scraping metadata
-  success           Boolean         @default(false)
-  error             String?
-  scrapedAt         DateTime        @default(now())
-  
-  // Relations
-  searchResult      SearchResult    @relation(fields: [searchResultId], references: [id])
-  email             Email           @relation(fields: [emailId], references: [id])
-  user              User            @relation(fields: [userId], references: [id])
-  
-  @@index([searchResultId])
-  @@index([emailId])
-  @@index([userId])
-  @@map("scraped_articles")
+model ScrapedResults {
+  id String @id @default(uuid())
+  msgId String @unique
+  userId String
+
+  // scraped results as json
+
+  data Json  // map: headline -> scraped articles
+  total Int @default(0)
+  successful Int @default(0)
+
+  scrappedAt DateTime @default(now())
+
+  // relations
+  email Email @relation(fields: [msgId], references: [id])
+
+  @@index([msgId])
+  @@map("scraped_results")
 }
 
-// Summaries table
-model Summary {
-  id                String          @id @default(uuid())
-  headlineId        String          @unique
-  emailId           String
-  userId            String
-  
-  // Summary data
-  summary           String          @db.Text
-  wordCount         Int
-  relevant          Boolean         @default(true)
-  
-  // Source info
-  sourceUrl         String?
-  sourceTitle       String?
-  articleIndex      Int?
-  articlesChecked   Int?
-  
-  // Processing metadata
-  generatedAt       DateTime        @default(now())
-  modelUsed         String          @default("gemini-2.0-flash-lite-001")
-  
-  // Relations
-  headline          Headline        @relation(fields: [headlineId], references: [id])
-  email             Email           @relation(fields: [emailId], references: [id])
-  user              User            @relation(fields: [userId], references: [id])
-  
-  @@index([emailId])
-  @@index([userId])
+model Summaries {
+  id String @id @default(uuid())
+  msgId String @unique
+  userId String
+
+  // summaries data as json
+  data Json
+  total Int @default(0)
+  successful Int @default(0)
+
+  modelUsed String  @default("gemini-2.0-flash-lite-001")
+  generatedAt DateTime @default(now())
+
+  // relations
+  email Email @relation(fields: [msgId], references: [id])
+
+  @@index([msgId])
   @@map("summaries")
 }
+
