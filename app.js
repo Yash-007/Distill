@@ -6,6 +6,8 @@ const ContentSummarizer = require('./contentSummarizer'); // NEW
 const express = require('express');
 const fs = require('fs');
 require('dotenv').config();
+const DatabaseService = require('./database');
+const db = new DatabaseService();
 
 const app = express();
 const gmailService = new GmailService();
@@ -24,54 +26,36 @@ const CONFIG = {
   MAX_PARALLEL_SCRAPES: 5
 };
 
-// Process a single email (updated with summarization)
+// processSingleEmail function
 async function processSingleEmail(email) {
   const startTime = Date.now();
   
   try {
     console.log(`\n📧 Processing: ${email.subject}`);
     
-    // Extract headlines using AI
+    // 1. Find or create user
+    const user = await db.findOrCreateUser(email.senderEmail);
+    
+    // 2. Save email to database
+    const savedEmail = await db.saveEmail(email, user.id);
+    
+    // 3. Extract headlines
     const headlineResult = await newsAI.extractNewsHeadlines(
       email.cleanedBody,
       email.subject,
       email.from
     );
     
-    // Initialize processed email object
-    const processedEmail = {
-      ...email,
-      newsHeadlines: headlineResult.success ? headlineResult.headlines : [],
-      headlineExtractionError: headlineResult.success ? null : headlineResult.error,
-      headlineCount: headlineResult.success ? headlineResult.headlines.length : 0,
-      aiMetadata: headlineResult.metadata || null,
-      searchResults: [],
-      scrapedArticles: [],
-      headlineSummaries: [], // NEW
-      searchMetadata: {
-        totalSearches: 0,
-        successfulSearches: 0,
-        failedSearches: 0
-      },
-      scrapeMetadata: {
-        totalScraped: 0,
-        successfulScrapes: 0,
-        failedScrapes: 0
-      },
-      summaryMetadata: { // NEW
-        totalSummaries: 0,
-        successfulSummaries: 0,
-        failedSummaries: 0
-      },
-      processedAt: new Date().toISOString(),
-      processingTime: 0
-    };
-    
-    // If headlines found, search, scrape, and summarize
     if (headlineResult.success && headlineResult.headlines.length > 0) {
-      // 1. Search headlines
-      console.log(`🔍 Searching ${headlineResult.headlines.length} headlines...`);
+      // 4. Save all headlines at once
+      await db.saveHeadlines(
+        headlineResult.headlines,
+        savedEmail.id,
+        user.id
+      );
       
+      // 5. Search headlines
+      console.log(`🔍 Searching ${headlineResult.headlines.length} headlines...`);
       const searchResults = await searxng.searchMultipleHeadlinesParallel(
         headlineResult.headlines,
         CONFIG.RESULTS_PER_HEADLINE,
@@ -80,65 +64,63 @@ async function processSingleEmail(email) {
       );
       
       if (searchResults.success) {
-        processedEmail.searchResults = searchResults.results;
-        processedEmail.searchMetadata = {
-          totalSearches: searchResults.totalHeadlines,
-          successfulSearches: searchResults.successfulSearches,
-          failedSearches: searchResults.failedSearches
-        };
+        // 6. Save all search results at once
+        await db.saveSearchResults(
+          searchResults.results,
+          savedEmail.id,
+          user.id
+        );
         
-        // 2. Scrape articles
+        // 7. Scrape articles
         console.log(`\n🌐 Scraping articles...`);
-        
         const scrapedResults = await articleScraper.scrapeHeadlineResults(
           searchResults.results,
           CONFIG.SCRAPE_URLS_PER_HEADLINE,
           CONFIG.MAX_PARALLEL_SCRAPES
         );
         
-        processedEmail.scrapedArticles = scrapedResults;
+        // 8. Save all scraped results at once
+        await db.saveScrapedResults(
+          scrapedResults,
+          savedEmail.id,
+          user.id
+        );
         
-        // Calculate scraping statistics
-        const totalScraped = scrapedResults.reduce((sum, r) => sum + (r.scrapedCount || 0), 0);
-        const totalAttempted = scrapedResults.reduce((sum, r) => sum + r.scrapedArticles.length, 0);
-        
-        processedEmail.scrapeMetadata = {
-          totalScraped: totalScraped,
-          successfulScrapes: totalScraped,
-          failedScrapes: totalAttempted - totalScraped,
-          totalAttempted: totalAttempted
-        };
-        
-        // 3. Generate AI summaries
+        // 9. Generate summaries
         console.log(`\n📝 Generating AI summaries...`);
-        
         const summaryResults = await contentSummarizer.summarizeHeadlines(scrapedResults);
         
-        processedEmail.headlineSummaries = summaryResults.summaries;
-        processedEmail.summaryMetadata = {
-          totalSummaries: summaryResults.totalHeadlines,
-          successfulSummaries: summaryResults.successfulSummaries,
-          failedSummaries: summaryResults.failedSummaries
-        };
-        
-        console.log(`✅ Summaries generated: ${summaryResults.successfulSummaries}/${summaryResults.totalHeadlines}`);
+        // 10. Save all summaries at once
+        if (summaryResults.success) {
+          await db.saveSummaries(
+            summaryResults.summaries,
+            savedEmail.id,
+            user.id
+          );
+        }
       }
     }
     
-    // Calculate processing time
-    processedEmail.processingTime = Date.now() - startTime;
-    console.log(`⏱️ Email processed in ${processedEmail.processingTime}ms`);
+    const processingTime = Date.now() - startTime;
+    console.log(`⏱️ Email processed and saved in ${processingTime}ms`);
     
-    return processedEmail;
+    // Get complete data
+    const completeData = await db.getEmailProcessingData(savedEmail.id);
+    
+    return {
+      msgId: savedEmail.id,
+      userId: user.id,
+      subject: savedEmail.subject,
+      totalHeadlines: completeData.headlines?.total || 0,
+      successfulSearches: completeData.searchResults?.successful || 0,
+      successfulScrapes: completeData.scrapedResults?.successful || 0,
+      successfulSummaries: completeData.summaries?.successful || 0,
+      processingTime: processingTime
+    };
     
   } catch (error) {
     console.error(`❌ Error processing email "${email.subject}":`, error);
-    return {
-      ...email,
-      processingError: error.message,
-      processedAt: new Date().toISOString(),
-      processingTime: Date.now() - startTime
-    };
+    throw error;
   }
 }
 
