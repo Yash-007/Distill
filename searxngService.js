@@ -63,7 +63,7 @@ class SearXNGService {
   }
 
   // NEW: Parallel search with rate limiting
-  async searchMultipleHeadlinesParallel(headlines, resultsPerHeadline = 4, maxParallel = 5, staggerDelay = 200) {
+  async searchMultipleHeadlinesParallel(headlines, resultsPerHeadline = 4, maxParallel = 3, staggerDelay = 500) {
     try {
       console.log(`🔍 Starting parallel search for ${headlines.length} headlines`);
       console.log(`⚙️ Max parallel: ${maxParallel}, Stagger delay: ${staggerDelay}ms`);
