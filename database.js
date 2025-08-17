@@ -77,6 +77,51 @@ class DatabaseService {
         throw error;
       }
 }
+
+async saveSearchResults(results, msgId, userId) {
+    try {
+      // Save new search results
+      const saved = await this.prisma.searchResults.create({
+        data: {
+          msgId,
+          userId,
+          data: results,
+          total: Array.isArray(results) ? results.length : 0,
+          successful: Array.isArray(results)
+            ? results.filter(r => r.success).length
+            : 0
+        }
+      });
+      console.log(`Saved search results for msgId: ${msgId}`);
+    } catch (error) {
+      console.error("Error saving search results:", error);
+      throw error;
+    }
+  }
+
+   async saveScrapedResults(results, msgId, userId) {
+    try {
+      // Save new scraped results
+      const successful = Array.isArray(results)
+        ? results.filter(r => r.scrapedArticles && r.scrapedArticles.length > 0).length
+        : 0;
+      const total = Array.isArray(results) ? results.length : 0;
+      const saved = await this.prisma.scrapedResults.create({
+        data: {
+          msgId,
+          userId,
+          data: results,
+          total,
+          successful
+        }
+      });
+      console.log(`Saved scraped results for msgId: ${msgId}`);
+    } catch (error) {
+      console.error("Error saving scraped results:", error);
+      throw error;
+    }
+  }
+  
 }
 
 module.exports = DatabaseService;
