@@ -121,7 +121,47 @@ async saveSearchResults(results, msgId, userId) {
       throw error;
     }
   }
-  
+
+    async saveSummaries(summaries, msgId, userId) {
+    try {
+      // Save new summaries
+      const successful = Array.isArray(summaries)
+        ? summaries.filter(s => s.success).length
+        : 0;
+      const total = Array.isArray(summaries) ? summaries.length : 0;
+      const saved = await this.prisma.summaries.create({
+        data: {
+          msgId,
+          userId,
+          data: summaries,
+          total,
+          successful
+        }
+      });
+      console.log(`Saved summaries for msgId: ${msgId}`);
+    } catch (error) {
+      console.error("Error saving summaries:", error);
+      throw error;
+    }
+  }
+
+  async getEmailProcessingData(msgId) {
+    try {
+      const emailData = await this.prisma.email.findUnique({
+      where: { id: msgId },
+      include: {
+      headlines: true,
+      searchResults: true,
+      scrapedResults: true,
+      summaries: true,
+  }  
+ });
+return emailData;
+    } catch (error) {
+      console.error("Error fetching email processed data:", error);
+      throw error;
+    }
+  }
 }
 
 module.exports = DatabaseService;
