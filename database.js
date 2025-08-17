@@ -59,6 +59,24 @@ class DatabaseService {
       throw error;
     }
   }
+
+  async saveHeadlines(headlines, msgId, userId){
+      try {
+       const savedHeadlines = await this.prisma.headlines.create({
+          data : {
+            userId: userId,
+            msgId: msgId,
+            data : headlines,
+            total : headlines.length
+          }
+        });
+
+        console.log(`Saved ${savedHeadlines.total} headlines for message ID: ${msgId}`);
+      } catch (error) {
+        console.error("Error saving headlines:", error);
+        throw error;
+      }
+}
 }
 
 module.exports = DatabaseService;
