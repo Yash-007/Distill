@@ -9,9 +9,12 @@ require('dotenv').config();
 const DatabaseService = require('./database');
 const { Prisma } = require('@prisma/client');
 const db = new DatabaseService();
+const cors = require('cors');
 
 const app = express();
 app.use(express.json());
+app.use(cors({origin: '*'}));
+
 const gmailService = new GmailService();
 const newsAI = new NewsHeadlineExtractor();
 const searxng = new SearXNGService(process.env.SEARXNG_URL || 'http://localhost:8080');
