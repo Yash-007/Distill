@@ -2,6 +2,8 @@ const fs = require('fs').promises;
 const path = require('path');
 const { authenticate } = require('@google-cloud/local-auth');
 const { google } = require('googleapis');
+const DatabaseService = require('./database');
+const db = new DatabaseService();
 
 class GmailService {
   constructor() {
@@ -17,10 +19,14 @@ class GmailService {
   // Load saved credentials if they exist
   async loadSavedCredentialsIfExist() {
     try {
-      const content = await fs.readFile(this.TOKEN_PATH);
-      const credentials = JSON.parse(content);
-      return google.auth.fromJSON(credentials);
+      const token = await db.findToken();
+      console.log('Loaded token from database:', token);
+      // const content = await fs.readFile(this.TOKEN_PATH);
+      // const credentials = JSON.parse(content);
+      // console.log('Parsed credentials:', credentials);
+      return google.auth.fromJSON(token);
     } catch (err) {
+      console.log("error", err);
       return null;
     }
   }
@@ -42,6 +48,7 @@ class GmailService {
   // Authorize and get Gmail client
   async authorize() {
     let client = await this.loadSavedCredentialsIfExist();
+    console.log('Client after loading saved credentials:', client);
     if (client) {
       return client;
     }
@@ -49,7 +56,7 @@ class GmailService {
       scopes: this.SCOPES,
       keyfilePath: this.CREDENTIALS_PATH,
     });
-    if (client.credentials) {
+    if (client?.credentials) {
       await this.saveCredentials(client);
     }
     return client;
@@ -88,7 +95,7 @@ class GmailService {
 
         console.log('=== EMAIL MESSAGE DETAILS ===');
         console.log('Message ID:', message.id);
-        console.log('Payload structure:', JSON.stringify(msg.data.payload, null, 2));
+        // console.log('Payload structure:', JSON.stringify(msg.data.payload, null, 2));
 
         // Extract email data
         const headers = msg.data.payload.headers;
@@ -110,7 +117,7 @@ class GmailService {
         console.log('Extracted body length:', body.length);
         console.log('Extracted body content:');
         console.log('--- START BODY ---');
-        console.log(body);
+        // console.log(body);
         console.log('--- END BODY ---');
         
         // Extract links from body
@@ -234,7 +241,7 @@ class GmailService {
     console.log('Total links removed:', totalLinksRemoved);
     console.log('Cleaned body length:', cleanedBody.length);
     console.log('Cleaned body:');
-    console.log(cleanedBody);
+    // console.log(cleanedBody);
 
     return cleanedBody;
   }
@@ -317,6 +324,62 @@ class GmailService {
       throw error;
     }
   }
+
+  async sendFinalDigestReply(to, subject, digestLink) {
+  const gmail = await this.getGmailService();
+  // Create email content
+  const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
+  const messageParts = [
+    `To: ${to}`,
+    'Content-Type: text/html; charset=utf-8',
+    'MIME-Version: 1.0',
+    `Subject: ${utf8Subject}`,
+    '',
+    `<html>
+      <body>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>📰 Your Newsletter Digest is Ready!</h2>
+          <p>Hello!</p>
+          <p>Your newsletter "<strong>${subject.replace('Fwd: ', '')}</strong>" has been processed.</p>
+          <p>
+            <a href="${digestLink}" style="display:inline-block;padding:10px 20px;background:#007bff;color:#fff;text-decoration:none;border-radius:4px;">
+              View Your Digest
+            </a>
+          </p>
+          <p>You can access all article summaries and links in your personal digest above.</p>
+          <p style="color: #666; font-size: 14px; margin-top: 30px;">
+            This is an automated message from Newsletter Digest.<br>
+            If you have questions, reply to this email.
+          </p>
+        </div>
+      </body>
+    </html>`
+  ];
+
+  const message = messageParts.join('\n');
+
+  // The body needs to be base64url encoded
+  const encodedMessage = Buffer.from(message)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  try {
+    const res = await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: encodedMessage,
+      },
+    });
+
+    console.log('Final digest reply sent:', res.data);
+    return res.data;
+  } catch (error) {
+    console.error('Error sending final digest reply:', error);
+    throw error;
+  }
+}
 }
 
 module.exports = GmailService;
