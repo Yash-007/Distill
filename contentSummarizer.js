@@ -8,7 +8,7 @@ class ContentSummarizer {
     this.initializeVertexAI();
     
     // Configuration for delays
-    this.API_CALL_DELAY = 10000; // 15 seconds between API calls
+    this.API_CALL_DELAY = 10000; // 10 seconds between API calls
     this.lastApiCallTime = 0;
   }
 
@@ -91,7 +91,7 @@ Instructions:
 - Start directly with the information
 
 Response format:
-If relevant: [100-word summary]
+If relevant: response
 If not relevant: NOT_RELEVANT
 `;
 
@@ -118,6 +118,7 @@ If not relevant: NOT_RELEVANT
       }
       
       if (!responseText || responseText === 'NOT_RELEVANT' || responseText.includes('NOT_RELEVANT')) {
+        console.log(`Content found not relevant to headline by Gemini: "${headline}"`);
         return {
           relevant: false,
           summary: null
@@ -155,9 +156,20 @@ If not relevant: NOT_RELEVANT
     console.log(`\n📄 Processing ${scrapedArticles.length} articles for: "${headline}"`);
     
     for (let i = 0; i < scrapedArticles.length; i++) {
+// each scrapped article
+      //   return {
+      //   success: true,
+      //   url: url,
+      //   title: metadata.title,
+      //   author: metadata.author,
+      //   content: content,
+      //   contentPreview: contentPreview,
+      //   wordCount: words.length,
+      //   scrapedAt: new Date().toISOString()
+      // };
       const article = scrapedArticles[i];
       
-      if (!article.success || !article.content || article.content.length < 100) {
+      if (!article.success || !article.content) {
         console.log(`   ⏭️ Article ${i + 1}: Skipped (no content)`);
         continue;
       }
@@ -205,6 +217,16 @@ If not relevant: NOT_RELEVANT
     console.log(`🚀 Using Vertex AI with model: gemini-2.0-flash-lite-001`);
     console.log(`⏱️ Note: Using ${this.API_CALL_DELAY/1000}s delay between API calls`);
     
+    // all scrapedResults (array [])
+        //     results.push({
+        //   headline: task.headline,
+        //   searchSuccess: true,
+        //   totalSearchResults: task.searchResults.length,
+        //   scrapedCount: scrapedArticles.filter(a => a.success).length,
+        //   scrapedArticles: scrapedArticles
+        // });
+
+
     // Estimate total time
     const totalApiCalls = scrapedResults.reduce((sum, h) => {
       return sum + (h.scrapedArticles ? h.scrapedArticles.length : 0);
