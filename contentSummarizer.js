@@ -31,6 +31,9 @@ class ContentSummarizer {
       this.vertexAI = new VertexAI({
         project: projectId,
         location: location,
+        googleAuthOptions: {
+          credentials: JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS || '{}'),
+        }
       });
       
       // Initialize the model

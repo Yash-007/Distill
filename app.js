@@ -375,6 +375,7 @@ async function processEmailsBatch(emails, batchSize = CONFIG.BATCH_SIZE) {
 async function main() {
   // await testCompletePipeline();
   setInterval(async () => {
+    console.log('Checking for new emails (scheduled)...\n');
     try {
       const results = await processEmails();
     } catch (error) {
