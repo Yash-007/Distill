@@ -20,7 +20,7 @@ const contentSummarizer = new ContentSummarizer(); // NEW
 
 // Configuration
 const CONFIG = {
-  BATCH_SIZE: parseInt(process.env.BATCH_SIZE) || 3,
+  BATCH_SIZE: parseInt(process.env.BATCH_SIZE) || 1,
   MAX_PARALLEL_SEARCHES: parseInt(process.env.MAX_PARALLEL_SEARCHES) || 5,
   SEARCH_STAGGER_DELAY: parseInt(process.env.SEARCH_STAGGER_DELAY) || 200,
   RESULTS_PER_HEADLINE: 4,
@@ -374,7 +374,13 @@ async function processEmailsBatch(emails, batchSize = CONFIG.BATCH_SIZE) {
 
 async function main() {
   // await testCompletePipeline();
-  const results = await processEmails();
+  setInterval(async () => {
+    try {
+      const results = await processEmails();
+    } catch (error) {
+      console.error('Error in scheduled email check:', error);
+    }
+  }, 3 * 60 * 1000); // 3 minutes in milliseconds
   // fs.writeFileSync('final_result.json', JSON.stringify(results, null, 2), 'utf-8');
   // console.log(results);
 }
