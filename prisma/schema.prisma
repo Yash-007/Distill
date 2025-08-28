@@ -10,7 +10,17 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url = env("DATABASE_URL")
+  url = env("DB_URL")
+}
+
+model GoogleToken {
+  id Int @id @default(autoincrement())
+  token Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("google_tokens")
 }
 
 model User {

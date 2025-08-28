@@ -7,6 +7,16 @@ class DatabaseService {
     })
   }
 
+  async findToken(){
+    try {
+      const tokenEntry = await this.prisma.googleToken.findFirst();
+      return tokenEntry ? tokenEntry.token : null;
+    } catch (error) {
+      console.error('Error retrieving token:', error);
+      return null;
+    }
+  }
+
   async findOrCreateUser(email) {
     try {
       let user = await this.prisma.user.findUnique({
