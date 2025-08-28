@@ -59,7 +59,7 @@ class ArticleScraper {
     
     for (const selector of selectors) {
       contentElement = $(selector).first();
-      if (contentElement.length && contentElement.text().trim().length > 100) break;
+      if (contentElement.length && contentElement.text().trim().length > 50) break;
     }
     
     // Extract text
@@ -177,6 +177,7 @@ class ArticleScraper {
     const results = [];
     
     // Process headlines in batches of 5
+
     const batchSize = 5;
     for (let i = 0; i < headlineSearchResults.length; i += batchSize) {
       const batch = headlineSearchResults.slice(i, i + batchSize);
@@ -189,6 +190,15 @@ class ArticleScraper {
       const batchTasks = [];
       
       for (const headlineResult of batch) {
+        // each headline 
+        //     return {
+        //   success: true,
+        //   headline: headline,
+        //   query: searchQuery,
+        //   results: searchResults.results,
+        //   totalFound: searchResults.results.length,
+        //   searchedAt: new Date().toISOString()
+        // };
         if (!headlineResult.success || !headlineResult.results || headlineResult.results.length === 0) {
           // No search results for this headline
           results.push({
@@ -221,10 +231,21 @@ class ArticleScraper {
         const scrapedArticles = await Promise.all(
           task.scrapeTasks.map(scrapeTask => limit(() => scrapeTask))
         );
-        
+
+        // each scraped article 
+      //   return {
+      //   success: true,
+      //   url: url,
+      //   title: metadata.title,
+      //   author: metadata.author,
+      //   content: content,
+      //   contentPreview: contentPreview,
+      //   wordCount: words.length,
+      //   scrapedAt: new Date().toISOString()
+      // };
         results.push({
           headline: task.headline,
-          searchSuccess: true,
+          searchSuccess: true, 
           totalSearchResults: task.searchResults.length,
           scrapedCount: scrapedArticles.filter(a => a.success).length,
           scrapedArticles: scrapedArticles
