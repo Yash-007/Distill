@@ -241,7 +241,7 @@ async function processEmails() {
     console.log(`📬 Found ${emails.length} emails to process`);
     
     const processedResults = await processEmailsBatch(emails, CONFIG.BATCH_SIZE);
-    fs.writeFileSync('Aggregated_Results.json', JSON.stringify(processedResults, null, 2), 'utf-8');
+    // fs.writeFileSync('Aggregated_Results.json', JSON.stringify(processedResults, null, 2), 'utf-8');
     
     // Log complete results for each email
     // processedResults.forEach(email => logCompleteResults(email));
@@ -375,7 +375,7 @@ async function processEmailsBatch(emails, batchSize = CONFIG.BATCH_SIZE) {
 async function main() {
   // await testCompletePipeline();
   const results = await processEmails();
-  fs.writeFileSync('final_result.json', JSON.stringify(results, null, 2), 'utf-8');
+  // fs.writeFileSync('final_result.json', JSON.stringify(results, null, 2), 'utf-8');
   // console.log(results);
 }
 
