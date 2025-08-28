@@ -143,8 +143,7 @@ Extract news headlines from the above content (respond with numbered list or "No
                !lowercaseLine.includes('content') &&
                !lowercaseLine.includes('newsletter') &&
                !line.startsWith('---') &&
-               !line.startsWith('===') &&
-               line.length > 10; // Minimum headline length
+               !line.startsWith('===')
       });
 
     // Clean up bullet points, numbers, and formatting
