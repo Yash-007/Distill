@@ -20,7 +20,7 @@ class GmailService {
   async loadSavedCredentialsIfExist() {
     try {
       const token = await db.findToken();
-      console.log('Loaded token from database:', token);
+      // console.log('Loaded token from database:', token);
       // const content = await fs.readFile(this.TOKEN_PATH);
       // const credentials = JSON.parse(content);
       // console.log('Parsed credentials:', credentials);
@@ -48,7 +48,7 @@ class GmailService {
   // Authorize and get Gmail client
   async authorize() {
     let client = await this.loadSavedCredentialsIfExist();
-    console.log('Client after loading saved credentials:', client);
+    // console.log('Client after loading saved credentials:', client);
     if (client) {
       return client;
     }
