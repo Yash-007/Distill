@@ -162,6 +162,18 @@ return emailData;
       throw error;
     }
   }
+
+    async getSummariesByMsgId(msgId) {
+    try {
+      const summariesData = await this.prisma.summaries.findUnique({
+        where: { msgId }
+      });
+      return summariesData;
+    } catch (error) {
+      console.error("Error fetching summaries for msgId:", error);
+      throw error;
+    }
+  }
 }
 
 module.exports = DatabaseService;
