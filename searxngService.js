@@ -1,9 +1,10 @@
 const axios = require('axios');
 
 class SearXNGService {
-  constructor(baseURL = 'http://localhost:8888') {
+  constructor(baseURL) {
+    console.log(`🔧 Initializing SearXNGService with baseURL: ${baseURL}`);
     this.baseURL = baseURL;
-    this.timeout = 10000;
+    this.timeout = 30000;
     this.maxRetries = 3;
     this.retryDelay = 1000;
   }
@@ -132,12 +133,12 @@ class SearXNGService {
     }
   }
 
-  // Keep the original sequential method for compatibility
-  async searchMultipleHeadlines(headlines, resultsPerHeadline = 4, delayBetweenSearches = 1000) {
-    // This method is kept for backward compatibility
-    // but now calls the parallel version with maxParallel = 1
-    return this.searchMultipleHeadlinesParallel(headlines, resultsPerHeadline, 1, delayBetweenSearches);
-  }
+  // // Keep the original sequential method for compatibility
+  // async searchMultipleHeadlines(headlines, resultsPerHeadline = 4, delayBetweenSearches = 1000) {
+  //   // This method is kept for backward compatibility
+  //   // but now calls the parallel version with maxParallel = 1
+  //   return this.searchMultipleHeadlinesParallel(headlines, resultsPerHeadline, 1, delayBetweenSearches);
+  // }
 
   prepareSearchQuery(headline) {
     return headline
@@ -210,7 +211,7 @@ class SearXNGService {
         engine: result.engine || 'unknown',
         score: result.score || 0
       }))
-      .filter(result => result.url && result.title);
+      .filter(result => result.url);
   }
 
   async testConnection() {
@@ -244,43 +245,6 @@ class SearXNGService {
         url: this.baseURL
       };
     }
-  }
-
-  getSearchStatistics(searchResults) {
-    if (!searchResults || !Array.isArray(searchResults)) {
-      return null;
-    }
-
-    const stats = {
-      totalHeadlines: searchResults.length,
-      successfulSearches: searchResults.filter(r => r.success).length,
-      failedSearches: searchResults.filter(r => !r.success).length,
-      totalArticles: 0,
-      averageArticlesPerHeadline: 0,
-      engines: new Set(),
-      topEngines: {}
-    };
-
-    searchResults.forEach(result => {
-      if (result.success && result.results) {
-        stats.totalArticles += result.results.length;
-        
-        result.results.forEach(article => {
-          if (article.engine) {
-            stats.engines.add(article.engine);
-            stats.topEngines[article.engine] = (stats.topEngines[article.engine] || 0) + 1;
-          }
-        });
-      }
-    });
-
-    stats.averageArticlesPerHeadline = stats.successfulSearches > 0 
-      ? (stats.totalArticles / stats.successfulSearches).toFixed(2)
-      : 0;
-
-    stats.engines = Array.from(stats.engines);
-
-    return stats;
   }
 
   delay(ms) {
