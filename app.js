@@ -7,9 +7,11 @@ const express = require('express');
 const fs = require('fs');
 require('dotenv').config();
 const DatabaseService = require('./database');
+const { Prisma } = require('@prisma/client');
 const db = new DatabaseService();
 
 const app = express();
+app.use(express.json());
 const gmailService = new GmailService();
 const newsAI = new NewsHeadlineExtractor();
 const searxng = new SearXNGService(process.env.SEARXNG_URL || 'http://localhost:8080');
@@ -97,6 +99,9 @@ async function processSingleEmail(email) {
             savedEmail.id,
             user.id
           );
+
+          const digestLink = `http://localhost:${process.env.PORT || 3000}/summaries?msgId=${savedEmail.id}`;
+          // gmailService.sendFinalDigestReply(email.senderEmail, "Distill Digest", digestLink);
         }
       }
     }
@@ -111,9 +116,13 @@ async function processSingleEmail(email) {
       msgId: savedEmail.id,
       userId: user.id,
       subject: savedEmail.subject,
+      headlines: completeData.headlines || [],
       totalHeadlines: completeData.headlines?.total || 0,
+      searchResults: completeData.searchResults || [],
       successfulSearches: completeData.searchResults?.successful || 0,
+      scrapedResults: completeData.scrapedResults || [],
       successfulScrapes: completeData.scrapedResults?.successful || 0,
+      summaries: completeData.summaries || [],
       successfulSummaries: completeData.summaries?.successful || 0,
       processingTime: processingTime
     };
@@ -125,89 +134,89 @@ async function processSingleEmail(email) {
 }
 
 // Test function for complete pipeline
-async function testCompletePipeline() {
-  console.log('🧪 Testing Complete Pipeline...\n');
+// async function testCompletePipeline() {
+//   console.log('🧪 Testing Complete Pipeline...\n');
   
-  // Test headlines
-  const testHeadlines = [
-    "Microsoft announces major layoffs in gaming division",
-    "Apple unveils new Vision Pro features at WWDC"
-  ];
+//   // Test headlines
+//   const testHeadlines = [
+//     "Microsoft announces major layoffs in gaming division",
+//     "Apple unveils new Vision Pro features at WWDC"
+//   ];
   
-  // 1. Search
-  console.log('1️⃣ Searching headlines...');
-  const searchResults = await searxng.searchMultipleHeadlinesParallel(
-    testHeadlines,
-    CONFIG.RESULTS_PER_HEADLINE,
-    CONFIG.MAX_PARALLEL_SEARCHES,
-    CONFIG.SEARCH_STAGGER_DELAY
-  );
+//   // 1. Search
+//   console.log('1️⃣ Searching headlines...');
+//   const searchResults = await searxng.searchMultipleHeadlinesParallel(
+//     testHeadlines,
+//     CONFIG.RESULTS_PER_HEADLINE,
+//     CONFIG.MAX_PARALLEL_SEARCHES,
+//     CONFIG.SEARCH_STAGGER_DELAY
+//   );
   
-  if (searchResults.success) {
-    // 2. Scrape
-    console.log('\n2️⃣ Scraping articles...');
-    const scrapedResults = await articleScraper.scrapeHeadlineResults(
-      searchResults.results,
-      CONFIG.SCRAPE_URLS_PER_HEADLINE,
-      CONFIG.MAX_PARALLEL_SCRAPES
-    );
+//   if (searchResults.success) {
+//     // 2. Scrape
+//     console.log('\n2️⃣ Scraping articles...');
+//     const scrapedResults = await articleScraper.scrapeHeadlineResults(
+//       searchResults.results,
+//       CONFIG.SCRAPE_URLS_PER_HEADLINE,
+//       CONFIG.MAX_PARALLEL_SCRAPES
+//     );
     
-    // 3. Summarize
-    console.log('\n3️⃣ Generating summaries...');
-    const summaryResults = await contentSummarizer.summarizeHeadlines(scrapedResults);
-    fs.writeFileSync('test_summaries_result.json', JSON.stringify(summaryResults, null, 2), 'utf-8');
+//     // 3. Summarize
+//     console.log('\n3️⃣ Generating summaries...');
+//     const summaryResults = await contentSummarizer.summarizeHeadlines(scrapedResults);
+//     fs.writeFileSync('test_summaries_result.json', JSON.stringify(summaryResults, null, 2), 'utf-8');
 
-    // 4. Display results
-    console.log('\n📊 Complete Pipeline Results:');
-    console.log('='.repeat(70));
+//     // 4. Display results
+//     console.log('\n📊 Complete Pipeline Results:');
+//     console.log('='.repeat(70));
     
-    summaryResults.summaries.forEach((summary, index) => {
-      console.log(`\n📰 Headline: "${summary.headline}"`);
+//     summaryResults.summaries.forEach((summary, index) => {
+//       console.log(`\n📰 Headline: "${summary.headline}"`);
       
-      if (summary.success) {
-        console.log(`✅ Summary (${summary.wordCount} words):`);
-        console.log(`   ${summary.summary}`);
-        console.log(`\n📌 Source: ${summary.sourceArticle.title || 'No title'}`);
-        console.log(`   URL: ${summary.sourceArticle.url}`);
-        console.log(`   (Article ${summary.sourceArticle.articleIndex} of ${summary.sourceArticle.totalArticlesChecked} checked)`);
-      } else {
-        console.log(`❌ No summary generated`);
-        console.log(`   Reason: ${summary.reason}`);
-      }
+//       if (summary.success) {
+//         console.log(`✅ Summary (${summary.wordCount} words):`);
+//         console.log(`   ${summary.summary}`);
+//         console.log(`\n📌 Source: ${summary.sourceArticle.title || 'No title'}`);
+//         console.log(`   URL: ${summary.sourceArticle.url}`);
+//         console.log(`   (Article ${summary.sourceArticle.articleIndex} of ${summary.sourceArticle.totalArticlesChecked} checked)`);
+//       } else {
+//         console.log(`❌ No summary generated`);
+//         console.log(`   Reason: ${summary.reason}`);
+//       }
       
-      console.log('-'.repeat(70));
-    });
-  }
-}
+//       console.log('-'.repeat(70));
+//     });
+//   }
+// }
 
-// Helper function to display complete results
-function logCompleteResults(email) {
-  console.log('\n' + '='.repeat(80));
-  console.log('📊 COMPLETE PROCESSING RESULTS');
-  console.log('='.repeat(80));
+// // Helper function to display complete results
+// function logCompleteResults(email) {
+//   console.log('\n' + '='.repeat(80));
+//   console.log('📊 COMPLETE PROCESSING RESULTS');
+//   console.log('='.repeat(80));
   
-  console.log(`\n📧 Email: ${email.subject}`);
-  console.log(`   Headlines found: ${email.headlineCount}`);
-  console.log(`   Articles scraped: ${email.scrapeMetadata.successfulScrapes}`);
-  console.log(`   Summaries generated: ${email.summaryMetadata.successfulSummaries}`);
+//   console.log(`\n📧 Email: ${email.subject}`);
+//   console.log(`   Headlines found: ${email.headlineCount}`);
+//   console.log(`   Articles scraped: ${email.scrapeMetadata.successfulScrapes}`);
+//   console.log(`   Summaries generated: ${email.summaryMetadata.successfulSummaries}`);
   
-  if (email.headlineSummaries && email.headlineSummaries.length > 0) {
-    console.log('\n📝 Generated Summaries:');
+//   if (email.headlineSummaries && email.headlineSummaries.length > 0) {
+//     console.log('\n📝 Generated Summaries:');
     
-    email.headlineSummaries.forEach((summary, idx) => {
-      console.log(`\n${idx + 1}. "${summary.headline}"`);
+//     email.headlineSummaries.forEach((summary, idx) => {
+//       console.log(`\n${idx + 1}. "${summary.headline}"`);
       
-      if (summary.success) {
-        console.log(`   ✅ Summary: ${summary.summary}`);
-        console.log(`   📌 Source: ${summary.sourceArticle.title || 'Article'} (checked ${summary.sourceArticle.totalArticlesChecked} articles)`);
-      } else {
-        console.log(`   ❌ No relevant content found`);
-      }
-    });
-  }
+//       if (summary.success) {
+//         console.log(`   ✅ Summary: ${summary.summary}`);
+//         console.log(`   📌 Source: ${summary.sourceArticle.title || 'Article'} (checked ${summary.sourceArticle.totalArticlesChecked} articles)`);
+//       } else {
+//         console.log(`   ❌ No relevant content found`);
+//       }
+//     });
+//   }
   
-  console.log('\n' + '='.repeat(80) + '\n');
-}
+//   console.log('\n' + '='.repeat(80) + '\n');
+// }
 
 // Update process emails to include summary stats
 async function processEmails() {
@@ -232,35 +241,71 @@ async function processEmails() {
     console.log(`📬 Found ${emails.length} emails to process`);
     
     const processedResults = await processEmailsBatch(emails, CONFIG.BATCH_SIZE);
+    fs.writeFileSync('Aggregated_Results.json', JSON.stringify(processedResults, null, 2), 'utf-8');
     
     // Log complete results for each email
-    processedResults.forEach(email => logCompleteResults(email));
+    // processedResults.forEach(email => logCompleteResults(email));
+    // each email 
+    //     return {
+    //   msgId: savedEmail.id,
+    //   userId: user.id,
+    //   subject: savedEmail.subject,
+    //   headlines: completeData.headlines || [],
+    //   totalHeadlines: completeData.headlines?.total || 0,
+    //   searchResults: completeData.searchResults || [],
+    //   successfulSearches: completeData.searchResults?.successful || 0,
+    //   scrapedResults: completeData.scrapedResults || [],
+    //   successfulScrapes: completeData.scrapedResults?.successful || 0,
+    //   summaries: completeData.summaries || [],
+    //   successfulSummaries: completeData.summaries?.successful || 0,
+    //   processingTime: processingTime
+    // };
     
     // Aggregate results
     const allHeadlines = [];
     const allSummaries = [];
+    let totalHeadlines = 0;
     let totalSearches = 0;
     let successfulSearches = 0;
     let totalScrapedArticles = 0;
     let successfulScrapes = 0;
     let totalSummaries = 0;
     let successfulSummaries = 0;
+
     
     processedResults.forEach(result => {
-      if (result.newsHeadlines && result.newsHeadlines.length > 0) {
-        allHeadlines.push(...result.newsHeadlines);
-      }
+    // each email result
+    //     return {
+    //   msgId: savedEmail.id,
+    //   userId: user.id,
+    //   subject: savedEmail.subject,
+    //   headlines: completeData.headlines || [],
+    //   totalHeadlines: completeData.headlines?.total || 0,
+    //   searchResults: completeData.searchResults || [],
+    //   successfulSearches: completeData.searchResults?.successful || 0,
+    //   scrapedResults: completeData.scrapedResults || [],
+    //   successfulScrapes: completeData.scrapedResults?.successful || 0,
+    //   summaries: completeData.summaries || [],
+    //   successfulSummaries: completeData.summaries?.successful || 0,
+    //   processingTime: processingTime
+    // };
+
+
+      // if (result.newsHeadlines && result.newsHeadlines.length > 0) {
+      //   allHeadlines.push(...result.headlines.data);
+      // }
       
-      if (result.headlineSummaries && result.headlineSummaries.length > 0) {
-        allSummaries.push(...result.headlineSummaries.filter(s => s.success));
-      }
+      // if (result.headlineSummaries && result.headlineSummaries.length > 0) {
+      //   allSummaries.push(...result.headlineSummaries.data.filter(s => s.success));
+      // }
       
-      totalSearches += result.searchMetadata?.totalSearches || 0;
-      successfulSearches += result.searchMetadata?.successfulSearches || 0;
-      totalScrapedArticles += result.scrapeMetadata?.totalAttempted || 0;
-      successfulScrapes += result.scrapeMetadata?.successfulScrapes || 0;
-      totalSummaries += result.summaryMetadata?.totalSummaries || 0;
-      successfulSummaries += result.summaryMetadata?.successfulSummaries || 0;
+      totalHeadlines += result?.totalHeadlines || 0;
+      totalSearches += result?.searchResults?.total || 0;
+      successfulSearches += result?.successfulSearches || 0;
+      totalScrapedArticles += result?.scrapedResults?.total || 0;
+      successfulScrapes += result?.successfulScrapes || 0;
+      totalSummaries += result?.summaries?.total || 0;
+      successfulSummaries += result?.successfulSummaries || 0;
     });
     
     const totalTime = Date.now() - overallStartTime;
@@ -269,7 +314,6 @@ async function processEmails() {
     console.log('\n' + '='.repeat(60));
     console.log('📊 FINAL PROCESSING SUMMARY:');
     console.log(`✅ Emails processed: ${emails.length}`);
-    console.log(`📰 Headlines extracted: ${allHeadlines.length}`);
     console.log(`🔍 Searches performed: ${successfulSearches}/${totalSearches}`);
     console.log(`🌐 Articles scraped: ${successfulScrapes}/${totalScrapedArticles}`);
     console.log(`📝 Summaries generated: ${successfulSummaries}/${totalSummaries}`);
@@ -279,9 +323,7 @@ async function processEmails() {
     return {
       processed: emails.length,
       results: processedResults,
-      totalHeadlines: allHeadlines.length,
-      headlines: allHeadlines,
-      summaries: allSummaries,
+      totalHeadlines,
       totalSearches: totalSearches,
       successfulSearches: successfulSearches,
       totalScrapedArticles: totalScrapedArticles,
@@ -303,12 +345,6 @@ async function processEmails() {
     };
   }
 }
-
-// Test endpoint
-app.get('/test-complete-pipeline', async (req, res) => {
-  await testCompletePipeline();
-  res.json({ message: 'Pipeline test completed. Check console for results.' });
-});
 
 // Other endpoints remain the same...
 
@@ -345,6 +381,43 @@ async function main() {
 
 main();
 
+async function testDatabase() {
+  // create dummy user and email 
+    // const userEmail = "dummyuser@example.com";
+    // const userId = userEmail; // Since your User id is the email address
+
+  // 1. Create or find the user
+  // const user = await db.findOrCreateUser(userEmail);
+  // // 2. Create a dummy email object
+  // const emailData = {
+  //   id: "dummy-gmail-id-123",
+  //   subject: "Test Email Subject",
+  //   senderEmail: "sender@example.com",
+  //   from: "Sender Name",
+  //   body: "This is the raw email content.",
+  //   cleanedBody: "This is the cleaned email body.",
+  //   rawBody: "This is the raw email body.",
+  //   date: Date.now(),
+  //   // Add any other required fields here
+  // };
+
+  // 3. Save the email
+  // const savedEmail = await db.saveEmail(emailData, userId);
+
+
+  // const headlines = ["abcd", "efgh"];
+  // const userId = "testUserId";
+  try {
+    // const savedHeadlines = await db.saveHeadlines(headlines, savedEmail.id, userId);
+    // console.log('Saved headlines:', savedHeadlines);
+  const summaries=  await db.getSummariesByMsgId('73fd92ea-35a0-4a27-85fd-dfbeefe15cc3');
+  console.log('Summaries:', summaries);
+  } catch (error) {
+    console.error('Error saving headlines:', error);
+  }
+}
+
+// testDatabase();
 
 async function testVertexAI() {
   const summarizer = new ContentSummarizer();
@@ -370,4 +443,31 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📰 Newsletter Processor with AI Summarization Ready`);
   console.log(`🔗 Test complete pipeline: http://localhost:${PORT}/test-complete-pipeline`);
+});
+
+app.get("/summaries", async (req, res)=>{
+  const msgId = req.query.msgId;
+
+  try {
+  const summariesData = await db.getSummariesByMsgId(msgId)
+  if (!summariesData || !summariesData.data || summariesData.data.length === 0) {
+    return res.status(404).json({
+      success: false,
+      error: 'No summaries found for this message ID'
+    });
+  }
+  const finalSummaries = summariesData?.data.filter(s => s.success)
+  res.json({
+    success: true,
+    summaries: finalSummaries,
+    total: finalSummaries.length,
+    msgId: msgId
+  })
+  } catch (error) {
+    console.error("Error fetching summaries:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch summaries'
+    });
+  }
 });
