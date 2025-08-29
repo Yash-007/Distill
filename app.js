@@ -405,7 +405,7 @@ async function main() {
   setInterval(async () => {
     console.log('Keeping DB and SearXNG alive...\n');
     await keepDBAndSearxngAlive();
-  }, 1 * 60 * 1000); // every 10 minutes
+  }, 10 * 60 * 1000); // every 10 minutes
 }
 
 main();
