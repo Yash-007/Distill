@@ -375,6 +375,19 @@ async function processEmailsBatch(emails, batchSize = CONFIG.BATCH_SIZE) {
   return results;
 }
 
+async function keepDBAndSearxngAlive() {
+  try {
+   const emailCount = await db.prisma.user.count()
+   console.log(`Database is alive. User count: ${emailCount}`);
+
+   const searchHeadline = "Anthropic’s auto-clicking AI Chrome extension raises browser-hijacking concerns";
+   const searxngResult = await searxng.searchHeadline(searchHeadline, 1);
+   console.log(`SearXNG is alive. Sample search for "${searchHeadline}":`, searxngResult);
+  } catch (error) {
+    console.error("Error keeping services alive:", error);
+  }
+}
+
 async function main() {
   // await testCompletePipeline();
   setInterval(async () => {
@@ -387,6 +400,12 @@ async function main() {
   }, 3 * 60 * 1000); // 3 minutes in milliseconds
   // fs.writeFileSync('final_result.json', JSON.stringify(results, null, 2), 'utf-8');
   // console.log(results);
+
+
+  setInterval(async () => {
+    console.log('Keeping DB and SearXNG alive...\n');
+    await keepDBAndSearxngAlive();
+  }, 1 * 60 * 1000); // every 10 minutes
 }
 
 main();
