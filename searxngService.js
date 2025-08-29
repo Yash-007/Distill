@@ -6,7 +6,7 @@ class SearXNGService {
     this.baseURL = baseURL;
     this.timeout = 30000;
     this.maxRetries = 3;
-    this.retryDelay = 1000;
+    this.retryDelay = 10000;
   }
 
   setBaseURL(url) {
