@@ -455,6 +455,10 @@ app.listen(PORT, () => {
   console.log(`🔗 Test complete pipeline: http://localhost:${PORT}/test-complete-pipeline`);
 });
 
+app.get("/", (req, res) => {
+  res.send("Distill is working fine.");
+})
+
 app.get("/summaries", async (req, res)=>{
   const msgId = req.query.msgId;
 
