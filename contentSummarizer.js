@@ -8,7 +8,7 @@ class ContentSummarizer {
     this.initializeVertexAI();
     
     // Configuration for delays
-    this.API_CALL_DELAY = 10000; // 10 seconds between API calls
+    this.API_CALL_DELAY = process.env.VERTEX_AI_API_CALL_DELAY || 5000; // seconds between API calls
     this.lastApiCallTime = 0;
   }
 
