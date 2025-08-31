@@ -395,7 +395,7 @@ async function main() {
     } catch (error) {
       console.error('Error in scheduled email check:', error);
     }
-  }, .5 * 60 * 1000); // 3 minutes in milliseconds
+  }, 3 * 60 * 1000); // 3 minutes in milliseconds
   // fs.writeFileSync('final_result.json', JSON.stringify(results, null, 2), 'utf-8');
   // console.log(results);
 
