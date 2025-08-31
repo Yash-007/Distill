@@ -23,10 +23,10 @@ const contentSummarizer = new ContentSummarizer();
 const CONFIG = {
   BATCH_SIZE: parseInt(process.env.BATCH_SIZE) || 1,
   MAX_PARALLEL_SEARCHES: parseInt(process.env.MAX_PARALLEL_SEARCHES) || 5,
-  SEARCH_STAGGER_DELAY: parseInt(process.env.SEARCH_STAGGER_DELAY) || 200,
-  RESULTS_PER_HEADLINE: 4,
-  SCRAPE_URLS_PER_HEADLINE: 2,
-  MAX_PARALLEL_SCRAPES: 5
+  SEARCH_STAGGER_DELAY: parseInt(process.env.SEARCH_STAGGER_DELAY) || 100,
+  RESULTS_PER_HEADLINE: parseInt(process.env.SEARCH_RESULTS_PER_HEADLINE) || 4,
+  SCRAPE_URLS_PER_HEADLINE: parseInt(process.env.SCRAPE_URLS_PER_HEADLINE) || 2,
+  MAX_PARALLEL_SCRAPES: parseInt(process.env.MAX_PARALLEL_SCRAPES) || 30
 };
 
 // processSingleEmail function

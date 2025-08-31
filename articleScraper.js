@@ -178,7 +178,7 @@ class ArticleScraper {
     
     // Process headlines in batches of 5
 
-    const batchSize = 5;
+    const batchSize = 30;
     for (let i = 0; i < headlineSearchResults.length; i += batchSize) {
       const batch = headlineSearchResults.slice(i, i + batchSize);
       const batchNumber = Math.floor(i / batchSize) + 1;
