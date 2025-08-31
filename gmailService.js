@@ -326,60 +326,66 @@ class GmailService {
   }
 
   async sendFinalDigestReply(to, subject, digestLink) {
-  const gmail = await this.getGmailService();
-  // Create email content
-  const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
-  const messageParts = [
-    `To: ${to}`,
-    'Content-Type: text/html; charset=utf-8',
-    'MIME-Version: 1.0',
-    `Subject: ${utf8Subject}`,
-    '',
-    `<html>
-      <body>
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>📰 Your Newsletter Digest is Ready!</h2>
-          <p>Hello!</p>
-          <p>Your newsletter "<strong>${subject.replace('Fwd: ', '')}</strong>" has been processed.</p>
-          <p>
-            <a href="${digestLink}" style="display:inline-block;padding:10px 20px;background:#007bff;color:#fff;text-decoration:none;border-radius:4px;">
-              View Your Digest
-            </a>
-          </p>
-          <p>You can access all article summaries and links in your personal digest above.</p>
-          <p style="color: #666; font-size: 14px; margin-top: 30px;">
-            This is an automated message from Newsletter Digest.<br>
-            If you have questions, reply to this email.
-          </p>
-        </div>
-      </body>
-    </html>`
-  ];
-
-  const message = messageParts.join('\n');
-
-  // The body needs to be base64url encoded
-  const encodedMessage = Buffer.from(message)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-
-  try {
-    const res = await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: {
-        raw: encodedMessage,
-      },
-    });
-
-    console.log('Final digest reply sent:', res.data);
-    return res.data;
-  } catch (error) {
-    console.error('Error sending final digest reply:', error);
-    throw error;
-  }
-}
+    const gmail = await this.getGmailService();
+  
+    // Create email content
+    const utf8Subject = `=?utf-8?B?${Buffer.from(`[Distill] ${subject}`).toString('base64')}?=`;
+    const messageParts = [
+      `To: ${to}`,
+      'Content-Type: text/html; charset=utf-8',
+      'MIME-Version: 1.0',
+      `Subject: ${utf8Subject}`,
+      '',
+      `<html>
+        <body>
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>📰 Your Distill Newsletter Digest is Ready!</h2>
+            <p>Hello!</p>
+            <p>
+              Your newsletter "<strong>${subject.replace('Fwd: ', '')}</strong>" 
+              has been processed by <b>Distill</b>.
+            </p>
+            <p>
+              <a href="${digestLink}" 
+                 style="display:inline-block;padding:10px 20px;background:#007bff;
+                        color:#fff;text-decoration:none;border-radius:4px;">
+                View Your Digest
+              </a>
+            </p>
+            <p>You can access all article summaries and links in your personal digest above.</p>
+            <p style="color: #666; font-size: 14px; margin-top: 30px;">
+              This is an automated message from <b>Distill</b>.<br>
+              If you have questions, reply to this email.
+            </p>
+          </div>
+        </body>
+      </html>`
+    ];
+  
+    const message = messageParts.join('\n');
+  
+    // Gmail API requires base64url encoding
+    const encodedMessage = Buffer.from(message)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  
+    try {
+      const res = await gmail.users.messages.send({
+        userId: 'me',
+        requestBody: {
+          raw: encodedMessage,
+        },
+      });
+  
+      console.log('Final digest reply sent:', res.data);
+      return res.data;
+    } catch (error) {
+      console.error('Error sending final digest reply:', error);
+      throw error;
+    }
+  }  
 }
 
 module.exports = GmailService;

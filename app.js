@@ -103,8 +103,8 @@ async function processSingleEmail(email) {
             user.id
           );
 
-          const digestLink = `http://localhost:${process.env.PORT || 3000}/summaries?msgId=${savedEmail.id}`;
-          // gmailService.sendFinalDigestReply(email.senderEmail, "Distill Digest", digestLink);
+          const digestLink = `${process.env.SERVER_URL}/${savedEmail.id}`;
+          gmailService.sendFinalDigestReply(email.senderEmail, "Digest", digestLink);
         }
       }
     }
