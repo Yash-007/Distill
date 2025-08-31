@@ -288,6 +288,142 @@ If not relevant: NOT_RELEVANT
   sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
+
+  // Extract news headlines from email content
+  async extractNewsHeadlines(cleanedBody, subject = '', emailFrom = '') {
+    try {
+      console.log('Extracting news headlines with Vertex AI...');
+      console.log('Content length:', cleanedBody.length);
+      console.log('Subject:', subject);
+      console.log('From:', emailFrom);
+      
+      if (!cleanedBody || cleanedBody.trim().length === 0) {
+        console.log('No content to analyze');
+        return {
+          success: false,
+          error: 'No content provided for analysis',
+          headlines: []
+        };
+      }
+
+      // Enforce delay before API call
+      await this.enforceApiDelay();
+
+      // Prepare the prompt for headline extraction
+      const prompt = `
+You are a news headline extraction expert. Your task is to analyze newsletter content and extract only legitimate news headlines.
+
+INSTRUCTIONS:
+1. Extract ONLY actual news headlines or content that could be legitimate news headlines
+2. IGNORE and DO NOT include:
+   - Advertisements or promotional content
+   - Product announcements from companies (unless major tech/business news)
+   - Marketing messages
+   - Subscription offers
+   - Social media posts
+   - Event promotions
+   - Job postings
+   - Personal opinions or blog posts
+   - Newsletter introductions or conclusions
+   - Unsubscribe links or footer content
+
+3. Format your response as a numbered list with one headline per line
+4. If no legitimate news headlines are found, respond with: "No news headlines found"
+
+Email Subject: ${subject}
+Email From: ${emailFrom}
+
+Content:
+${cleanedBody}
+
+---
+Extract news headlines from the above content (respond with numbered list or "No news headlines found"):
+      `.trim();
+
+      console.log('Sending to Vertex AI...');
+      const request = {
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: prompt }],
+          },
+        ],
+      };
+
+      const result = await this.model.generateContent(request);
+      const response = result.response;
+      const extractedText = response.candidates[0].content.parts[0].text.trim();
+
+      console.log('Vertex AI response received');
+      console.log('Raw response:', extractedText);
+
+      // Process the response to extract individual headlines
+      const headlines = this.parseHeadlines(extractedText);
+
+      console.log(`Extracted ${headlines.length} news headlines`);
+      
+      return {
+        success: true,
+        headlines: headlines,
+        rawResponse: extractedText,
+        metadata: {
+          originalContentLength: cleanedBody.length,
+          subject: subject,
+          emailFrom: emailFrom,
+          extractedAt: new Date().toISOString(),
+          headlinesCount: headlines.length
+        }
+      };
+
+    } catch (error) {
+      console.error('Error extracting headlines with Vertex AI:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to extract headlines with AI',
+        headlines: [],
+        rawResponse: null
+      };
+    }
+  }
+
+  // Parse headlines from AI response
+  parseHeadlines(responseText) {
+    if (!responseText || responseText.trim().toLowerCase().includes('no news headlines found')) {
+      return [];
+    }
+
+    // Split by lines and clean up
+    const lines = responseText
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .filter(line => {
+        // Remove common non-headline patterns
+        const lowercaseLine = line.toLowerCase();
+        return !lowercaseLine.includes('extract') &&
+               !lowercaseLine.includes('headline') &&
+               !lowercaseLine.includes('analysis') &&
+               !lowercaseLine.includes('content') &&
+               !lowercaseLine.includes('newsletter') &&
+               !line.startsWith('---') &&
+               !line.startsWith('===')
+      });
+
+    // Clean up bullet points, numbers, and formatting
+    const cleanedHeadlines = lines.map(line => {
+      return line
+        .replace(/^[-•*]\s*/, '') // Remove bullet points
+        .replace(/^\d+\.\s*/, '') // Remove numbered lists
+        .replace(/^[\d\w]+\)\s*/, '') // Remove numbered lists with parentheses
+        .replace(/^\**/, '') // Remove leading asterisks
+        .replace(/\**$/, '') // Remove trailing asterisks
+        .replace(/^["']/, '') // Remove leading quotes
+        .replace(/["']$/, '') // Remove trailing quotes
+        .trim();
+    }).filter(line => line.length > 5); // Filter very short lines
+
+    return cleanedHeadlines;
+  }
 }
 
 module.exports = ContentSummarizer;

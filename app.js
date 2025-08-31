@@ -1,5 +1,4 @@
 const GmailService = require('./gmailService');
-const NewsHeadlineExtractor = require('./newsHeadlineExtractor');
 const SearXNGService = require('./searxngService');
 const ArticleScraper = require('./articleScraper');
 const ContentSummarizer = require('./contentSummarizer'); // NEW
@@ -16,10 +15,9 @@ app.use(express.json());
 app.use(cors({origin: '*'}));
 
 const gmailService = new GmailService();
-const newsAI = new NewsHeadlineExtractor();
 const searxng = new SearXNGService(process.env.SEARXNG_URL || 'http://localhost:8080');
 const articleScraper = new ArticleScraper();
-const contentSummarizer = new ContentSummarizer(); // NEW
+const contentSummarizer = new ContentSummarizer();
 
 // Configuration
 const CONFIG = {
@@ -45,7 +43,7 @@ async function processSingleEmail(email) {
     const savedEmail = await db.saveEmail(email, user.id);
     
     // 3. Extract headlines
-    const headlineResult = await newsAI.extractNewsHeadlines(
+    const headlineResult = await contentSummarizer.extractNewsHeadlines(
       email.cleanedBody,
       email.subject,
       email.from
@@ -397,7 +395,7 @@ async function main() {
     } catch (error) {
       console.error('Error in scheduled email check:', error);
     }
-  }, 3 * 60 * 1000); // 3 minutes in milliseconds
+  }, .5 * 60 * 1000); // 3 minutes in milliseconds
   // fs.writeFileSync('final_result.json', JSON.stringify(results, null, 2), 'utf-8');
   // console.log(results);
 
