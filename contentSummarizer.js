@@ -361,6 +361,18 @@ Extract news headlines from the above content (respond with numbered list or "No
       const headlines = this.parseHeadlines(extractedText);
 
       console.log(`Extracted ${headlines.length} news headlines`);
+
+      if (headlines.length === 0) {
+        return {
+          success: false,
+          error: 'No news headlines found',
+          headlines: [],
+          rawResponse: extractedText,
+          metadata: {
+            originalContentLength: cleanedBody.length,
+          }
+        }
+      }
       
       return {
         success: true,

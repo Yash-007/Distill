@@ -38,6 +38,24 @@ async function processSingleEmail(email) {
     
     // 1. Find or create user
     const user = await db.findOrCreateUser(email.senderEmail);
+
+    if (user?.isBlacklisted) {
+      console.log('User is blacklisted. Skipping email:', email.subject);
+      return {
+        msgId: null,
+        userId: user.id,
+        subject: email.subject,
+        headlines: [],
+        totalHeadlines: 0,
+        searchResults: [],
+        successfulSearches: 0,
+        scrapedResults: [],
+        successfulScrapes: 0,
+        summaries: [],
+        successfulSummaries: 0,
+        processingTime: Date.now() - startTime
+      };
+    }
     
     // 2. Save email to database
     const savedEmail = await db.saveEmail(email, user.id);
@@ -105,6 +123,18 @@ async function processSingleEmail(email) {
           gmailService.sendFinalDigestReply(email.senderEmail, "Digest", digestLink);
         }
       }
+    } else {
+      console.log('No headlines found for email:', email.subject);
+      user.unrelevantEmails++;
+      user.totalEmails++;
+      if (user.unrelevantEmails >= 3) {
+        user.isBlacklisted = true;
+        user.blacklistedAt = new Date();
+      }
+      await db.prisma.user.update({
+        where: {id: user.id},
+        data: {unrelevantEmails: user.unrelevantEmails, totalEmails: user.totalEmails, isBlacklisted: user.isBlacklisted, blacklistedAt: user.blacklistedAt}
+      });
     }
     
     const processingTime = Date.now() - startTime;

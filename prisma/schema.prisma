@@ -25,6 +25,10 @@ model GoogleToken {
 
 model User {
   id        String @id // gmail address
+  unrelevantEmails Int @default(0)
+  totalEmails Int @default(0)
+  isBlacklisted Boolean @default(false)
+  blacklistedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -54,7 +58,7 @@ model Email {
 
   // Relations 
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   headlines Headlines?
   searchResults SearchResults?
   scrapedResults ScrapedResults?
@@ -76,7 +80,7 @@ model Headlines {
   createdAt DateTime @default(now())
 
   // relations
-  email Email @relation(fields: [msgId], references: [id])
+  email Email @relation(fields: [msgId], references: [id], onDelete: Cascade)
 
 @@index([msgId])
 @@map("headlines")
@@ -116,7 +120,7 @@ model ScrapedResults {
   scrappedAt DateTime @default(now())
 
   // relations
-  email Email @relation(fields: [msgId], references: [id])
+  email Email @relation(fields: [msgId], references: [id], onDelete: Cascade)
 
   @@index([msgId])
   @@map("scraped_results")
@@ -136,7 +140,7 @@ model Summaries {
   generatedAt DateTime @default(now())
 
   // relations
-  email Email @relation(fields: [msgId], references: [id])
+  email Email @relation(fields: [msgId], references: [id], onDelete: Cascade)
 
   @@index([msgId])
   @@map("summaries")
