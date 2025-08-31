@@ -101,7 +101,7 @@ async function processSingleEmail(email) {
             user.id
           );
 
-          const digestLink = `${process.env.SERVER_URL}/${savedEmail.id}`;
+          const digestLink = `${process.env.FE_URL}/${savedEmail.id}`;
           gmailService.sendFinalDigestReply(email.senderEmail, "Digest", digestLink);
         }
       }
