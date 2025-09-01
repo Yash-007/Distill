@@ -76,8 +76,8 @@ class ContentSummarizer {
       const prompt = `
 You are a news content analyzer. Your task is to:
 1. Check if the article content is relevant to the given headline
-2. If relevant, create a 100-word summary
-3. If not relevant, respond with "NOT_RELEVANT"
+2. If relevant, create a concise summary in bullet points (between 50-80 words total)
+3. If not relevant, only output "NOT_RELEVANT"
 
 Headline: "${headline}"
 Article Title: "${articleTitle}"
@@ -87,19 +87,25 @@ ${articleContent.substring(0, 3000)} // Limit content length for API
 
 Instructions:
 - First determine if the article content actually relates to the headline topic
-- If the content is about a completely different topic, respond with "NOT_RELEVANT"
-- If relevant, write EXACTLY a 100-word summary that captures the key points
-- Focus on facts and main information
-- Do not include phrases like "This article discusses" or "The content talks about"
-- Start directly with the information
+- If the content is about a completely different topic, output only "NOT_RELEVANT"
+- If relevant:
+  • Create 3-5 bullet points
+  • Total length MUST be between 50-80 words
+  • Each bullet point should be at least 10 words
+  • Each point should start with "•"
+  • Focus on key facts and main information
+  • Be direct and concise
+  • Do not use any introductory phrases
+  • Do not include the word "response" anywhere
+  • If summary is under 50 words, add more detail to existing points
 
-Response format:
-If relevant: response
+Output format:
 If not relevant: NOT_RELEVANT
+If relevant: Just the bullet points, nothing else
 `;
 
       console.log(`🤖 Checking relevance for headline: "${headline}"`);
-      console.log(`📡 Making Vertex AI call (gemini-2.0-flash-lite-001)...`);
+      // console.log(`📡 Making Vertex AI call (gemini-2.0-flash-lite-001)...`);
       
       // Generate content using Vertex AI
       const request = {
