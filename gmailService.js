@@ -274,25 +274,32 @@ class GmailService {
       `Subject: ${utf8Subject}`,
       '',
       `<html>
-        <body>
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2>✅ Newsletter Received!</h2>
-            <p>Hello!</p>
-            <p>Thank you for forwarding "<strong>${subject.replace('Fwd: ', '')}</strong>" to our newsletter digest service.</p>
+        <body style="background-color: #0a0a0a; color: #ffffff;">
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <div style="margin-bottom: 10px;">
+                <span style="color: #8B5CF6; font-size: 40px;">⚡</span>
+              </div>
+              <h1 style="color: #ffffff; margin: 10px 0;">Distill</h1>
+            </div>
             
-            <div style="background: #f0f0f0; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <p style="margin: 0;"><strong>What happens next:</strong></p>
-              <ul>
+            <h2 style="color: #8B5CF6;">📬 Newsletter Received!</h2>
+            <p>Hello!</p>
+            <p>Thank you for forwarding "<strong style="color: #8B5CF6">${subject.replace('Fwd: ', '')}</strong>" to Distill.</p>
+            
+            <div style="background: rgba(139, 92, 246, 0.1); border: 1px solid #8B5CF6; padding: 20px; border-radius: 12px; margin: 20px 0;">
+              <p style="margin: 0; color: #8B5CF6;"><strong>What happens next:</strong></p>
+              <ul style="color: #ffffff; margin-top: 10px;">
                 <li>We'll extract article links from your newsletter</li>
-                <li>Generate 100-word summaries for each article</li>
+                <li>Generate concise bullet-point summaries</li>
                 <li>Add them to your personal digest</li>
               </ul>
             </div>
             
             <p>You'll receive another email once processing is complete with a link to your digest.</p>
             
-            <p style="color: #666; font-size: 14px; margin-top: 30px;">
-              This is an automated response from Newsletter Digest<br>
+            <p style="color: #666; font-size: 14px; margin-top: 30px; text-align: center;">
+              This is an automated response from Distill<br>
               If you have questions, reply to this email.
             </p>
           </div>
@@ -337,24 +344,42 @@ class GmailService {
       `Subject: ${utf8Subject}`,
       '',
       `<html>
-        <body>
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2>📰 Your Distill Newsletter Digest is Ready!</h2>
+        <body style="background-color: #0a0a0a; color: #ffffff;">
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <div style="margin-bottom: 10px;">
+                <span style="color: #8B5CF6; font-size: 40px;">⚡</span>
+              </div>
+              <h1 style="color: #ffffff; margin: 10px 0;">Distill</h1>
+            </div>
+
+            <h2 style="color: #8B5CF6;">📰 Your Newsletter Digest is Ready!</h2>
             <p>Hello!</p>
             <p>
-              Your newsletter "<strong>${subject.replace('Fwd: ', '')}</strong>" 
-              has been processed by <b>Distill</b>.
+              Your newsletter "<strong style="color: #8B5CF6">${subject.replace('Fwd: ', '')}</strong>" 
+              has been processed and distilled into key insights.
             </p>
-            <p>
+            
+            <div style="text-align: center; margin: 30px 0;">
               <a href="${digestLink}" 
-                 style="display:inline-block;padding:10px 20px;background:#007bff;
-                        color:#fff;text-decoration:none;border-radius:4px;">
+                 style="display:inline-block; padding: 12px 24px; background-color: #8B5CF6;
+                        color: #fff; text-decoration: none; border-radius: 8px;
+                        font-weight: bold; transition: background-color 0.2s;">
                 View Your Digest
               </a>
-            </p>
-            <p>You can access all article summaries and links in your personal digest above.</p>
-            <p style="color: #666; font-size: 14px; margin-top: 30px;">
-              This is an automated message from <b>Distill</b>.<br>
+            </div>
+
+            <div style="background: rgba(139, 92, 246, 0.1); border: 1px solid #8B5CF6; padding: 20px; border-radius: 12px; margin: 20px 0;">
+              <p style="margin: 0; text-align: center;">
+                Access your personalized digest to read:<br>
+                • Extracted Headlines<br>
+                • Concise Bullet-Point Summaries<br>
+                • Original Article Links
+              </p>
+            </div>
+            
+            <p style="color: #666; font-size: 14px; margin-top: 30px; text-align: center;">
+              This is an automated message from Distill<br>
               If you have questions, reply to this email.
             </p>
           </div>
