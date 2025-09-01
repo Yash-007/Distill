@@ -497,9 +497,9 @@ async function testVertexAI() {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  // console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📰 Newsletter Processor with AI Summarization Ready`);
-  console.log(`🔗 Test complete pipeline: http://localhost:${PORT}/test-complete-pipeline`);
+  // console.log(`🔗 Test complete pipeline: http://localhost:${PORT}/test-complete-pipeline`);
 });
 
 app.get("/", (req, res) => {
